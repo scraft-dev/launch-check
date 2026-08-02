@@ -1,47 +1,60 @@
 "use client";
 
 import { useState } from "react";
-
-function isValidUrl(value: string) {
-  try {
-    const parsedUrl = new URL(value);
-    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { getUrlValidationError, getUserFriendlyScanError, type ScanErrorResponse, type ScanResponse } from "@/lib/scan";
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
-  const [showResults, setShowResults] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
 
-  function handleStartScan() {
+  async function handleStartScan() {
     const trimmedUrl = url.trim();
+    const validationError = getUrlValidationError(trimmedUrl);
 
-    if (!trimmedUrl || !isValidUrl(trimmedUrl)) {
-      setError("Enter a valid website URL.");
+    if (validationError) {
+      setError(validationError);
+      setScanResult(null);
       setIsScanning(false);
-      setShowResults(false);
       return;
     }
 
     setError("");
-    setShowResults(false);
+    setScanResult(null);
     setIsScanning(true);
 
-    window.setTimeout(() => {
+    try {
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      const data = (await response.json()) as ScanResponse | ScanErrorResponse;
+
+      if (!response.ok) {
+        const scanError = "error" in data ? data.error : "Unable to scan this website right now.";
+        setError(getUserFriendlyScanError(scanError));
+        setScanResult(null);
+      } else {
+        setScanResult(data as ScanResponse);
+      }
+    } catch {
+      setError("Unable to scan this website right now.");
+      setScanResult(null);
+    } finally {
       setIsScanning(false);
-      setShowResults(true);
-    }, 2000);
+    }
   }
 
   function handleReset() {
     setUrl("");
     setError("");
     setIsScanning(false);
-    setShowResults(false);
+    setScanResult(null);
   }
 
   return (
@@ -95,7 +108,7 @@ export default function Home() {
             </p>
           </section>
 
-          {showResults ? (
+          {scanResult ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-slate-900">
@@ -106,23 +119,28 @@ export default function Home() {
                 </span>
               </div>
 
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Critical</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">0</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">High</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">1</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Medium</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">2</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">Low</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">3</p>
-                </div>
+              <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p>
+                  <span className="font-semibold text-slate-900">URL:</span> {scanResult.url}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">Final URL:</span> {scanResult.finalUrl}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">Page Title:</span> {scanResult.pageTitle}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">HTTP Status:</span> {scanResult.httpStatus}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">Load Time:</span> {scanResult.loadTime}ms
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">Console Errors:</span> {scanResult.consoleErrors.length}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">Failed Requests:</span> {scanResult.failedRequests.length}
+                </p>
               </div>
 
               <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
