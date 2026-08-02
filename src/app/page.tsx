@@ -9,12 +9,13 @@ import {
   type ScanErrorResponse,
   type ScanResponse,
 } from "@/lib/scan";
+import type { ScanAnalysis } from "@/lib/ai-analysis";
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
+  const [scanResult, setScanResult] = useState<(ScanResponse & { analysis?: ScanAnalysis }) | null>(null);
 
   const scanReport = useMemo(() => {
     if (!scanResult) {
@@ -48,14 +49,14 @@ export default function Home() {
         body: JSON.stringify({ url: trimmedUrl }),
       });
 
-      const data = (await response.json()) as ScanResponse | ScanErrorResponse;
+      const data = (await response.json()) as (ScanResponse & { analysis?: ScanAnalysis }) | ScanErrorResponse;
 
       if (!response.ok) {
         const scanError = "error" in data ? data.error : "Unable to scan this website right now.";
         setError(getUserFriendlyScanError(scanError));
         setScanResult(null);
       } else {
-        setScanResult(data as ScanResponse);
+        setScanResult(data as ScanResponse & { analysis?: ScanAnalysis });
       }
     } catch {
       setError("Unable to scan this website right now.");
@@ -189,6 +190,21 @@ export default function Home() {
                 <p className="text-sm font-semibold text-slate-900">Summary</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{scanReport.summary}</p>
               </div>
+
+              {scanResult.analysis ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">AI Analysis</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{scanResult.analysis.summary}</p>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {scanResult.analysis.suggestions.map((suggestion) => (
+                      <li key={suggestion.title} className="rounded-lg bg-white p-3">
+                        <p className="font-medium text-slate-900">{suggestion.title}</p>
+                        <p>{suggestion.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {scanReport.issues.length > 0 ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">

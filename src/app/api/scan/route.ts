@@ -1,4 +1,5 @@
 import { chromium, type Browser, type Page } from "playwright";
+import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
 
 export type ScanResponse = {
   url: string;
@@ -14,6 +15,10 @@ export type ScanResponse = {
     status: number;
     error: string;
   }>;
+};
+
+export type ScanResponseWithAnalysis = ScanResponse & {
+  analysis: ScanAnalysis;
 };
 
 function normalizeUrl(value: string): string {
@@ -157,7 +162,8 @@ export async function POST(request: Request) {
     }
 
     const scanResult = await collectScanData(targetUrl);
-    return Response.json(scanResult);
+    const analysis = buildFallbackAnalysis(scanResult);
+    return Response.json({ ...scanResult, analysis } satisfies ScanResponseWithAnalysis);
   } catch {
     return Response.json({ error: "Unable to scan this website right now." }, { status: 500 });
   }
