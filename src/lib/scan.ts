@@ -18,6 +18,24 @@ export type ScanErrorResponse = {
   error: string;
 };
 
+export type IssueSeverity = "critical" | "high" | "medium" | "low";
+
+export type ScanReport = {
+  launchScore: number;
+  severitySummary: Record<IssueSeverity, number>;
+  summary: string;
+  performance: {
+    httpStatus: number;
+    loadTime: number;
+    loadTimeLabel: string;
+  };
+  issues: Array<{
+    severity: IssueSeverity;
+    title: string;
+    detail: string;
+  }>;
+};
+
 export function getUrlValidationError(value: string): string | null {
   const trimmedValue = value.trim();
 
@@ -125,4 +143,91 @@ export function getUserFriendlyScanError(message: string | null | undefined): st
   }
 
   return "Unable to scan this website right now.";
+}
+
+export function buildScanReport(scanResult: ScanResponse): ScanReport {
+  const severitySummary: Record<IssueSeverity, number> = {
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+
+  if (scanResult.httpStatus >= 400) {
+    severitySummary.high += 1;
+  }
+
+  if (scanResult.pageErrors.length > 0) {
+    severitySummary.medium += 1;
+  }
+
+  if (scanResult.consoleErrors.length > 0) {
+    severitySummary.low += 1;
+  }
+
+  if (scanResult.failedRequests.length > 0) {
+    severitySummary.medium += 1;
+  }
+
+  const totalIssues = Object.values(severitySummary).reduce((sum, count) => sum + count, 0);
+  const launchScore = Math.max(0, Math.min(100, 100 - totalIssues * 10));
+  const loadTimeLabel = scanResult.loadTime > 1000 ? `${(scanResult.loadTime / 1000).toFixed(1)}s` : `${scanResult.loadTime}ms`;
+
+  const issues = [
+    ...(scanResult.httpStatus >= 400
+      ? [
+          {
+            severity: "high" as IssueSeverity,
+            title: "HTTP status error",
+            detail: `Received HTTP ${scanResult.httpStatus}.`,
+          },
+        ]
+      : []),
+    ...(scanResult.pageErrors.length > 0
+      ? [
+          {
+            severity: "medium" as IssueSeverity,
+            title: "Page runtime error",
+            detail: scanResult.pageErrors[0],
+          },
+        ]
+      : []),
+    ...(scanResult.consoleErrors.length > 0
+      ? [
+          {
+            severity: "low" as IssueSeverity,
+            title: "Console error",
+            detail: scanResult.consoleErrors[0],
+          },
+        ]
+      : []),
+    ...(scanResult.failedRequests.length > 0
+      ? [
+          {
+            severity: "medium" as IssueSeverity,
+            title: "Failed request",
+            detail: scanResult.failedRequests[0].error,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    launchScore,
+    severitySummary,
+    summary:
+      totalIssues === 0
+        ? "Your website looks healthy. No issues were detected."
+        : `Your website looks healthy. ${totalIssues} issue${totalIssues === 1 ? "" : "s"} should be reviewed before launch.`,
+    performance: {
+      httpStatus: scanResult.httpStatus,
+      loadTime: scanResult.loadTime,
+      loadTimeLabel,
+    },
+    issues,
+  };
+}
+
+export function exportScanReport(scanResult: ScanResponse): string {
+  return JSON.stringify(buildScanReport(scanResult), null, 2);
 }

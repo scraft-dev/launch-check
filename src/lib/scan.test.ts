@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getUrlValidationError, getUserFriendlyScanError } from "./scan";
+import {
+  buildScanReport,
+  exportScanReport,
+  getUrlValidationError,
+  getUserFriendlyScanError,
+  type ScanResponse,
+} from "./scan";
 
 test("accepts valid public http URLs", () => {
   assert.equal(getUrlValidationError("https://example.com"), null);
@@ -30,4 +36,32 @@ test("maps common scan errors to user-friendly messages", () => {
     getUserFriendlyScanError("browser launch failed"),
     "The browser could not be launched for scanning.",
   );
+});
+
+test("builds a report with score, severity counts, and export JSON", () => {
+  const sampleScan: ScanResponse = {
+    url: "https://example.com",
+    finalUrl: "https://example.com",
+    pageTitle: "Example",
+    httpStatus: 200,
+    loadTime: 1320,
+    consoleErrors: ["console error"],
+    pageErrors: ["runtime error"],
+    failedRequests: [
+      {
+        url: "https://example.com/app.js",
+        resourceType: "script",
+        status: 404,
+        error: "Not Found",
+      },
+    ],
+  };
+
+  const report = buildScanReport(sampleScan);
+  assert.equal(report.launchScore, 70);
+  assert.equal(report.severitySummary.medium, 2);
+  assert.equal(report.severitySummary.low, 1);
+  assert.equal(report.performance.loadTimeLabel, "1.3s");
+  assert.equal(report.issues[0].severity, "medium");
+  assert.match(exportScanReport(sampleScan), /"launchScore": 70/);
 });

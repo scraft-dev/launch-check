@@ -1,13 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { getUrlValidationError, getUserFriendlyScanError, type ScanErrorResponse, type ScanResponse } from "@/lib/scan";
+import { useMemo, useState } from "react";
+import {
+  buildScanReport,
+  exportScanReport,
+  getUrlValidationError,
+  getUserFriendlyScanError,
+  type ScanErrorResponse,
+  type ScanResponse,
+} from "@/lib/scan";
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
+
+  const scanReport = useMemo(() => {
+    if (!scanResult) {
+      return null;
+    }
+
+    return buildScanReport(scanResult);
+  }, [scanResult]);
 
   async function handleStartScan() {
     const trimmedUrl = url.trim();
@@ -55,6 +70,22 @@ export default function Home() {
     setError("");
     setIsScanning(false);
     setScanResult(null);
+  }
+
+  function handleExport() {
+    if (!scanResult) {
+      return;
+    }
+
+    const blob = new Blob([exportScanReport(scanResult)], { type: "application/json" });
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = window.document.createElement("a");
+    link.href = objectUrl;
+    link.download = "scan-report.json";
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    window.URL.revokeObjectURL(objectUrl);
   }
 
   return (
@@ -108,14 +139,14 @@ export default function Home() {
             </p>
           </section>
 
-          {scanResult ? (
+          {scanResult && scanReport ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-slate-900">
-                  Launch Score: 95
+                  Launch Score: {scanReport.launchScore}
                 </h2>
                 <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
-                  Healthy
+                  {scanReport.launchScore >= 80 ? "Healthy" : "Needs review"}
                 </span>
               </div>
 
@@ -130,10 +161,10 @@ export default function Home() {
                   <span className="font-semibold text-slate-900">Page Title:</span> {scanResult.pageTitle}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">HTTP Status:</span> {scanResult.httpStatus}
+                  <span className="font-semibold text-slate-900">HTTP Status:</span> {scanReport.performance.httpStatus}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Load Time:</span> {scanResult.loadTime}ms
+                  <span className="font-semibold text-slate-900">Load Time:</span> {scanReport.performance.loadTimeLabel}
                 </p>
                 <p>
                   <span className="font-semibold text-slate-900">Console Errors:</span> {scanResult.consoleErrors.length}
@@ -143,20 +174,53 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-900">Summary</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Your website looks healthy. One issue should be reviewed before launch.
-                </p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {(["critical", "high", "medium", "low"] as const).map((severity) => (
+                  <div key={severity} className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-sm capitalize text-slate-500">{severity}</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {scanReport.severitySummary[severity]}
+                    </p>
+                  </div>
+                ))}
               </div>
 
-              <button
-                type="button"
-                className="mt-6 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                onClick={handleReset}
-              >
-                Scan another website
-              </button>
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Summary</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{scanReport.summary}</p>
+              </div>
+
+              {scanReport.issues.length > 0 ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">Issues</p>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {scanReport.issues.map((issue) => (
+                      <li key={`${issue.title}-${issue.detail}`} className="rounded-lg bg-white p-3">
+                        <p className="font-medium capitalize text-slate-900">{issue.severity}</p>
+                        <p>{issue.title}</p>
+                        <p className="text-slate-500">{issue.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  onClick={handleReset}
+                >
+                  Scan another website
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  onClick={handleExport}
+                >
+                  Export JSON
+                </button>
+              </div>
             </section>
           ) : null}
         </div>
