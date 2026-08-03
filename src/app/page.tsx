@@ -236,6 +236,9 @@ export default function Home() {
               <Link className="text-sm font-medium text-blue-600" href="/docs">
                 Read docs
               </Link>
+              <Link className="text-sm font-medium text-blue-600" href="/integrations">
+                View integrations
+              </Link>
             </div>
           </div>
         </section>
