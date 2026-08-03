@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   buildScanReport,
@@ -10,6 +11,7 @@ import {
   type ScanResponse,
 } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
+import { saveScanToHistory } from "@/lib/user-history";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -56,7 +58,17 @@ export default function Home() {
         setError(getUserFriendlyScanError(scanError));
         setScanResult(null);
       } else {
-        setScanResult(data as ScanResponse & { analysis?: ScanAnalysis });
+        const nextScanResult = data as ScanResponse & { analysis?: ScanAnalysis };
+        setScanResult(nextScanResult);
+
+        saveScanToHistory({
+          url: nextScanResult.url,
+          finalUrl: nextScanResult.finalUrl,
+          pageTitle: nextScanResult.pageTitle,
+          httpStatus: nextScanResult.httpStatus,
+          loadTime: nextScanResult.loadTime,
+          summary: buildScanReport(nextScanResult).summary,
+        });
       }
     } catch {
       setError("Unable to scan this website right now.");
@@ -130,6 +142,12 @@ export default function Home() {
             {error ? (
               <p className="mt-3 text-sm font-medium text-red-600">{error}</p>
             ) : null}
+
+            <div className="mt-4">
+              <Link className="text-sm font-medium text-blue-600" href="/dashboard">
+                Go to dashboard
+              </Link>
+            </div>
           </div>
         </section>
 
