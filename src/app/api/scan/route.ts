@@ -1,5 +1,6 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
+import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 
 export type ScanResponse = {
   url: string;
@@ -37,7 +38,11 @@ function normalizeUrl(value: string): string {
 function isPrivateUrl(value: string): boolean {
   const hostname = new URL(value).hostname;
 
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0"
+  ) {
     return true;
   }
 
@@ -126,7 +131,9 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
       timeout: 30000,
     });
 
-    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
+    await page
+      .waitForLoadState("networkidle", { timeout: 5000 })
+      .catch(() => undefined);
 
     const loadTime = Date.now() - startedAt;
     const finalUrl = page.url();
@@ -143,7 +150,11 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
       pageErrors,
       failedRequests: failedRequests.filter(
         (item, index, self) =>
-          index === self.findIndex((candidate) => candidate.url === item.url && candidate.status === item.status),
+          index ===
+          self.findIndex(
+            (candidate) =>
+              candidate.url === item.url && candidate.status === item.status,
+          ),
       ),
     };
   } finally {
@@ -153,7 +164,11 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { url?: string };
+    const body = (await request.json()) as {
+      url?: string;
+      multiPage?: boolean;
+      crawlConfig?: { maxPages?: number; maxDepth?: number };
+    };
     const targetUrl = normalizeUrl(body.url ?? "");
     const validationError = validateUrl(targetUrl);
 
@@ -163,8 +178,30 @@ export async function POST(request: Request) {
 
     const scanResult = await collectScanData(targetUrl);
     const analysis = buildFallbackAnalysis(scanResult);
-    return Response.json({ ...scanResult, analysis } satisfies ScanResponseWithAnalysis);
+    const crawlConfig = getSafeCrawlConfig(body.crawlConfig?.maxPages ?? 1);
+    const crawlResult = buildCrawlResult(
+      [targetUrl],
+      [
+        {
+          url: scanResult.finalUrl,
+          title: scanResult.pageTitle,
+          status: scanResult.httpStatus,
+        },
+      ],
+    );
+    const crawlSummary = body.multiPage
+      ? `${crawlResult.summary} (bounded to ${crawlConfig.maxPages} page${crawlConfig.maxPages === 1 ? "" : "s"})`
+      : undefined;
+
+    return Response.json({
+      ...scanResult,
+      analysis,
+      crawlSummary,
+    } satisfies ScanResponseWithAnalysis & { crawlSummary?: string });
   } catch {
-    return Response.json({ error: "Unable to scan this website right now." }, { status: 500 });
+    return Response.json(
+      { error: "Unable to scan this website right now." },
+      { status: 500 },
+    );
   }
 }

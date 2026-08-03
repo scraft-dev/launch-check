@@ -105,7 +105,9 @@ function isPrivateHostname(hostname: string): boolean {
   return false;
 }
 
-export function getUserFriendlyScanError(message: string | null | undefined): string {
+export function getUserFriendlyScanError(
+  message: string | null | undefined,
+): string {
   const normalizedMessage = (message ?? "").toLowerCase();
 
   if (
@@ -134,7 +136,10 @@ export function getUserFriendlyScanError(message: string | null | undefined): st
     return "The site requested a CAPTCHA challenge.";
   }
 
-  if (normalizedMessage.includes("access denied") || normalizedMessage.includes("denied")) {
+  if (
+    normalizedMessage.includes("access denied") ||
+    normalizedMessage.includes("denied")
+  ) {
     return "Access to this website was denied.";
   }
 
@@ -169,9 +174,15 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
     severitySummary.medium += 1;
   }
 
-  const totalIssues = Object.values(severitySummary).reduce((sum, count) => sum + count, 0);
+  const totalIssues = Object.values(severitySummary).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
   const launchScore = Math.max(0, Math.min(100, 100 - totalIssues * 10));
-  const loadTimeLabel = scanResult.loadTime > 1000 ? `${(scanResult.loadTime / 1000).toFixed(1)}s` : `${scanResult.loadTime}ms`;
+  const loadTimeLabel =
+    scanResult.loadTime > 1000
+      ? `${(scanResult.loadTime / 1000).toFixed(1)}s`
+      : `${scanResult.loadTime}ms`;
 
   const issues = [
     ...(scanResult.httpStatus >= 400

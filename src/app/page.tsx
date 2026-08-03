@@ -12,12 +12,17 @@ import {
 } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
 import { saveScanToHistory } from "@/lib/user-history";
+import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<(ScanResponse & { analysis?: ScanAnalysis }) | null>(null);
+  const [scanResult, setScanResult] = useState<
+    (ScanResponse & { analysis?: ScanAnalysis }) | null
+  >(null);
+  const [crawlSummary, setCrawlSummary] = useState<string | null>(null);
+  const [multiPageEnabled, setMultiPageEnabled] = useState(false);
 
   const scanReport = useMemo(() => {
     if (!scanResult) {
@@ -40,26 +45,51 @@ export default function Home() {
 
     setError("");
     setScanResult(null);
+    setCrawlSummary(null);
     setIsScanning(true);
 
     try {
+      const crawlConfig = getSafeCrawlConfig(multiPageEnabled ? 6 : 1);
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: trimmedUrl }),
+        body: JSON.stringify({
+          url: trimmedUrl,
+          multiPage: multiPageEnabled,
+          crawlConfig,
+        }),
       });
 
-      const data = (await response.json()) as (ScanResponse & { analysis?: ScanAnalysis }) | ScanErrorResponse;
+      const data = (await response.json()) as
+        | (ScanResponse & { analysis?: ScanAnalysis; crawlSummary?: string })
+        | ScanErrorResponse;
 
       if (!response.ok) {
-        const scanError = "error" in data ? data.error : "Unable to scan this website right now.";
+        const scanError =
+          "error" in data
+            ? data.error
+            : "Unable to scan this website right now.";
         setError(getUserFriendlyScanError(scanError));
         setScanResult(null);
       } else {
-        const nextScanResult = data as ScanResponse & { analysis?: ScanAnalysis };
+        const nextScanResult = data as ScanResponse & {
+          analysis?: ScanAnalysis;
+          crawlSummary?: string;
+        };
         setScanResult(nextScanResult);
+        const crawlResult = buildCrawlResult(
+          [trimmedUrl],
+          [
+            {
+              url: nextScanResult.finalUrl,
+              title: nextScanResult.pageTitle,
+              status: nextScanResult.httpStatus,
+            },
+          ],
+        );
+        setCrawlSummary(nextScanResult.crawlSummary ?? crawlResult.summary);
 
         saveScanToHistory({
           url: nextScanResult.url,
@@ -83,6 +113,8 @@ export default function Home() {
     setError("");
     setIsScanning(false);
     setScanResult(null);
+    setCrawlSummary(null);
+    setMultiPageEnabled(false);
   }
 
   function handleExport() {
@@ -90,7 +122,9 @@ export default function Home() {
       return;
     }
 
-    const blob = new Blob([exportScanReport(scanResult)], { type: "application/json" });
+    const blob = new Blob([exportScanReport(scanResult)], {
+      type: "application/json",
+    });
     const objectUrl = window.URL.createObjectURL(blob);
     const link = window.document.createElement("a");
     link.href = objectUrl;
@@ -139,13 +173,37 @@ export default function Home() {
               </button>
             </div>
 
+            <label className="mt-4 flex items-center gap-3 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={multiPageEnabled}
+                onChange={() => setMultiPageEnabled((value) => !value)}
+              />
+              Run a multi-page crawl (safe internal-link scan)
+            </label>
+
             {error ? (
               <p className="mt-3 text-sm font-medium text-red-600">{error}</p>
             ) : null}
 
-            <div className="mt-4">
-              <Link className="text-sm font-medium text-blue-600" href="/dashboard">
+            <div className="mt-4 flex flex-wrap gap-4">
+              <Link
+                className="text-sm font-medium text-blue-600"
+                href="/dashboard"
+              >
                 Go to dashboard
+              </Link>
+              <Link
+                className="text-sm font-medium text-blue-600"
+                href="/pricing"
+              >
+                View pricing
+              </Link>
+              <Link className="text-sm font-medium text-blue-600" href="/faq">
+                View FAQ
+              </Link>
+              <Link className="text-sm font-medium text-blue-600" href="/docs">
+                Read docs
               </Link>
             </div>
           </div>
@@ -156,6 +214,11 @@ export default function Home() {
             <p className="text-lg font-semibold text-blue-700">
               {isScanning ? "Scanning your website..." : "Ready to scan"}
             </p>
+            {crawlSummary ? (
+              <p className="mt-3 rounded-2xl border border-blue-200 bg-white/70 p-4 text-sm text-slate-700">
+                {crawlSummary}
+              </p>
+            ) : null}
           </section>
 
           {scanResult && scanReport ? (
@@ -171,52 +234,86 @@ export default function Home() {
 
               <div className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                 <p>
-                  <span className="font-semibold text-slate-900">URL:</span> {scanResult.url}
+                  <span className="font-semibold text-slate-900">URL:</span>{" "}
+                  {scanResult.url}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Final URL:</span> {scanResult.finalUrl}
+                  <span className="font-semibold text-slate-900">
+                    Final URL:
+                  </span>{" "}
+                  {scanResult.finalUrl}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Page Title:</span> {scanResult.pageTitle}
+                  <span className="font-semibold text-slate-900">
+                    Page Title:
+                  </span>{" "}
+                  {scanResult.pageTitle}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">HTTP Status:</span> {scanReport.performance.httpStatus}
+                  <span className="font-semibold text-slate-900">
+                    HTTP Status:
+                  </span>{" "}
+                  {scanReport.performance.httpStatus}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Load Time:</span> {scanReport.performance.loadTimeLabel}
+                  <span className="font-semibold text-slate-900">
+                    Load Time:
+                  </span>{" "}
+                  {scanReport.performance.loadTimeLabel}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Console Errors:</span> {scanResult.consoleErrors.length}
+                  <span className="font-semibold text-slate-900">
+                    Console Errors:
+                  </span>{" "}
+                  {scanResult.consoleErrors.length}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">Failed Requests:</span> {scanResult.failedRequests.length}
+                  <span className="font-semibold text-slate-900">
+                    Failed Requests:
+                  </span>{" "}
+                  {scanResult.failedRequests.length}
                 </p>
               </div>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {(["critical", "high", "medium", "low"] as const).map((severity) => (
-                  <div key={severity} className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-sm capitalize text-slate-500">{severity}</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">
-                      {scanReport.severitySummary[severity]}
-                    </p>
-                  </div>
-                ))}
+                {(["critical", "high", "medium", "low"] as const).map(
+                  (severity) => (
+                    <div key={severity} className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-sm capitalize text-slate-500">
+                        {severity}
+                      </p>
+                      <p className="mt-1 text-2xl font-semibold text-slate-900">
+                        {scanReport.severitySummary[severity]}
+                      </p>
+                    </div>
+                  ),
+                )}
               </div>
 
               <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-900">Summary</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{scanReport.summary}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {scanReport.summary}
+                </p>
               </div>
 
               {scanResult.analysis ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">AI Analysis</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{scanResult.analysis.summary}</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    AI Analysis
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {scanResult.analysis.summary}
+                  </p>
                   <ul className="mt-3 space-y-2 text-sm text-slate-600">
                     {scanResult.analysis.suggestions.map((suggestion) => (
-                      <li key={suggestion.title} className="rounded-lg bg-white p-3">
-                        <p className="font-medium text-slate-900">{suggestion.title}</p>
+                      <li
+                        key={suggestion.title}
+                        className="rounded-lg bg-white p-3"
+                      >
+                        <p className="font-medium text-slate-900">
+                          {suggestion.title}
+                        </p>
                         <p>{suggestion.detail}</p>
                       </li>
                     ))}
@@ -229,8 +326,13 @@ export default function Home() {
                   <p className="text-sm font-semibold text-slate-900">Issues</p>
                   <ul className="mt-3 space-y-2 text-sm text-slate-600">
                     {scanReport.issues.map((issue) => (
-                      <li key={`${issue.title}-${issue.detail}`} className="rounded-lg bg-white p-3">
-                        <p className="font-medium capitalize text-slate-900">{issue.severity}</p>
+                      <li
+                        key={`${issue.title}-${issue.detail}`}
+                        className="rounded-lg bg-white p-3"
+                      >
+                        <p className="font-medium capitalize text-slate-900">
+                          {issue.severity}
+                        </p>
                         <p>{issue.title}</p>
                         <p className="text-slate-500">{issue.detail}</p>
                       </li>

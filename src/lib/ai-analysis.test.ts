@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildFallbackAnalysis, buildAnalysisPrompt, trimAnalysisPayload } from "./ai-analysis";
+import {
+  buildFallbackAnalysis,
+  buildAnalysisPrompt,
+  trimAnalysisPayload,
+} from "./ai-analysis";
 
 test("builds a concise fallback analysis for common issues", () => {
   const analysis = buildFallbackAnalysis({

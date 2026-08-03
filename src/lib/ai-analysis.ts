@@ -38,34 +38,40 @@ export function trimAnalysisPayload(value: string): string {
   return `${value.slice(0, 597)}...`;
 }
 
-export function buildFallbackAnalysis(payload: ScanAnalysisPayload): ScanAnalysis {
+export function buildFallbackAnalysis(
+  payload: ScanAnalysisPayload,
+): ScanAnalysis {
   const suggestions: ScanAnalysisSuggestion[] = [];
 
   if (payload.httpStatus >= 400) {
     suggestions.push({
       title: "Inspect the failing response",
-      detail: "Check the server response and verify the target route is available.",
+      detail:
+        "Check the server response and verify the target route is available.",
     });
   }
 
   if (payload.pageErrors.length > 0) {
     suggestions.push({
       title: "Review runtime errors",
-      detail: "Inspect the reported runtime error and fix the originating script or component.",
+      detail:
+        "Inspect the reported runtime error and fix the originating script or component.",
     });
   }
 
   if (payload.consoleErrors.length > 0) {
     suggestions.push({
       title: "Tackle console warnings",
-      detail: "Resolve the console errors so failures are visible before launch.",
+      detail:
+        "Resolve the console errors so failures are visible before launch.",
     });
   }
 
   if (payload.failedRequests.length > 0) {
     suggestions.push({
       title: "Fix failed requests",
-      detail: "Verify that the referenced assets or endpoints are reachable and returning successful responses.",
+      detail:
+        "Verify that the referenced assets or endpoints are reachable and returning successful responses.",
     });
   }
 
@@ -76,8 +82,14 @@ export function buildFallbackAnalysis(payload: ScanAnalysisPayload): ScanAnalysi
     });
   }
 
-  const issueSignals = payload.failedRequests.length + payload.pageErrors.length + payload.consoleErrors.length;
-  const statusSummary = payload.httpStatus >= 400 ? `HTTP ${payload.httpStatus}` : "healthy response";
+  const issueSignals =
+    payload.failedRequests.length +
+    payload.pageErrors.length +
+    payload.consoleErrors.length;
+  const statusSummary =
+    payload.httpStatus >= 400
+      ? `HTTP ${payload.httpStatus}`
+      : "healthy response";
 
   return {
     summary: `The scan found ${issueSignals} issue signals and reported ${statusSummary}. Review the recommendations below before launch.`,

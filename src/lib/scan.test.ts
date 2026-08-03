@@ -14,13 +14,25 @@ test("accepts valid public http URLs", () => {
 });
 
 test("rejects invalid URLs", () => {
-  assert.equal(getUrlValidationError("not-a-url"), "Enter a valid website URL.");
-  assert.equal(getUrlValidationError("file:///tmp/test"), "Enter a valid website URL.");
+  assert.equal(
+    getUrlValidationError("not-a-url"),
+    "Enter a valid website URL.",
+  );
+  assert.equal(
+    getUrlValidationError("file:///tmp/test"),
+    "Enter a valid website URL.",
+  );
 });
 
 test("rejects private IP hosts", () => {
-  assert.equal(getUrlValidationError("http://127.0.0.1"), "Enter a valid website URL.");
-  assert.equal(getUrlValidationError("https://192.168.1.10"), "Enter a valid website URL.");
+  assert.equal(
+    getUrlValidationError("http://127.0.0.1"),
+    "Enter a valid website URL.",
+  );
+  assert.equal(
+    getUrlValidationError("https://192.168.1.10"),
+    "Enter a valid website URL.",
+  );
 });
 
 test("maps common scan errors to user-friendly messages", () => {

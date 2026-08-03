@@ -77,7 +77,9 @@ export function logoutUser(): void {
   }
 }
 
-export function saveScanToHistory(scan: Omit<StoredScan, "id" | "createdAt">): StoredScan {
+export function saveScanToHistory(
+  scan: Omit<StoredScan, "id" | "createdAt">,
+): StoredScan {
   const entry: StoredScan = {
     id: `scan-${Date.now()}`,
     createdAt: new Date().toISOString(),
