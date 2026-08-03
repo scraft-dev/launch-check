@@ -8,6 +8,7 @@ import {
   getUrlValidationError,
   getUserFriendlyScanError,
   type ScanErrorResponse,
+  type PdfReportPayload,
   type ScanResponse,
 } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
@@ -15,7 +16,6 @@ import { saveScanToHistory } from "@/lib/user-history";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 import { buildLighthouseAudit } from "@/lib/lighthouse";
 import { createScreenshotArtifacts } from "@/lib/screenshots";
-import { buildPdfReport, createPdfDownloadUrl } from "@/lib/pdf";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -26,9 +26,13 @@ export default function Home() {
   >(null);
   const [crawlSummary, setCrawlSummary] = useState<string | null>(null);
   const [multiPageEnabled, setMultiPageEnabled] = useState(false);
-  const [lighthouseAudit, setLighthouseAudit] = useState<ReturnType<typeof buildLighthouseAudit> | null>(null);
-  const [screenshots, setScreenshots] = useState<ReturnType<typeof createScreenshotArtifacts>>([]);
-  const [pdfReport, setPdfReport] = useState<ReturnType<typeof buildPdfReport> | null>(null);
+  const [lighthouseAudit, setLighthouseAudit] = useState<ReturnType<
+    typeof buildLighthouseAudit
+  > | null>(null);
+  const [screenshots, setScreenshots] = useState<
+    ReturnType<typeof createScreenshotArtifacts>
+  >([]);
+  const [pdfReport, setPdfReport] = useState<PdfReportPayload | null>(null);
 
   const scanReport = useMemo(() => {
     if (!scanResult) {
@@ -89,16 +93,20 @@ export default function Home() {
         };
         setScanResult(nextScanResult);
         const nextLighthouseAudit = buildLighthouseAudit(nextScanResult);
-        const nextScreenshots = createScreenshotArtifacts(nextScanResult.finalUrl);
-        const nextPdfReport = buildPdfReport(
-          "Launch Check Report",
-          buildScanReport(nextScanResult).summary,
-          nextLighthouseAudit.opportunities.map((opportunity) => opportunity.title),
-          nextScreenshots.map((screenshot) => screenshot.url),
+        const nextScreenshots = createScreenshotArtifacts(
+          nextScanResult.finalUrl,
+          {
+            desktop: nextScanResult.screenshots?.find(
+              (screenshot) => screenshot.kind === "desktop",
+            )?.dataUrl,
+            mobile: nextScanResult.screenshots?.find(
+              (screenshot) => screenshot.kind === "mobile",
+            )?.dataUrl,
+          },
         );
         setLighthouseAudit(nextLighthouseAudit);
         setScreenshots(nextScreenshots);
-        setPdfReport(nextPdfReport);
+        setPdfReport(nextScanResult.pdfReport ?? null);
         const crawlResult = buildCrawlResult(
           [trimmedUrl],
           [
@@ -389,10 +397,10 @@ export default function Home() {
                   </p>
                   <a
                     className="mt-3 inline-flex rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white"
-                    href={createPdfDownloadUrl(pdfReport)}
-                    download="launch-check-report.txt"
+                    href={`data:application/pdf;base64,${pdfReport.pdfBase64}`}
+                    download="launch-check-report.pdf"
                   >
-                    Download report preview
+                    Download PDF report
                   </a>
                 </div>
               ) : null}

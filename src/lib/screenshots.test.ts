@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createScreenshotArtifacts, pruneScreenshotArtifacts } from "./screenshots";
+import {
+  createScreenshotArtifacts,
+  loadStoredScreenshotArtifacts,
+  persistScreenshotArtifacts,
+  pruneScreenshotArtifacts,
+} from "./screenshots";
 
 test("creates desktop and mobile screenshot artifacts", () => {
   const artifacts = createScreenshotArtifacts("https://example.com");
@@ -22,4 +27,19 @@ test("prunes screenshot artifacts to the configured maximum", () => {
   );
 
   assert.equal(artifacts.length, 8);
+});
+
+test("persists screenshot artifacts to storage and reloads them", () => {
+  const storage = new Map<string, string>();
+  const artifacts = createScreenshotArtifacts("https://example.com", {
+    desktop: "data:image/png;base64,desktop",
+    mobile: "data:image/png;base64,mobile",
+  });
+
+  const persisted = persistScreenshotArtifacts(artifacts, storage as never);
+  const reloaded = loadStoredScreenshotArtifacts(storage as never);
+
+  assert.equal(persisted.length, 2);
+  assert.equal(reloaded.length, 2);
+  assert.match(reloaded[0].dataUrl ?? "", /desktop/);
 });

@@ -1,6 +1,11 @@
 import { chromium, type Browser, type Page } from "playwright";
 import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
+import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
+import { buildPdfReport } from "@/lib/pdf";
+import { buildScanReport, type PdfReportPayload } from "@/lib/scan";
+import lighthouse from "lighthouse";
+import * as chromeLauncher from "chrome-launcher";
 
 export type ScanResponse = {
   url: string;
@@ -16,6 +21,13 @@ export type ScanResponse = {
     status: number;
     error: string;
   }>;
+  lighthouseMetrics?: LighthouseMetrics;
+  screenshots?: Array<{
+    kind: "desktop" | "mobile";
+    dataUrl: string;
+    note: string;
+  }>;
+  pdfReport?: PdfReportPayload;
 };
 
 export type ScanResponseWithAnalysis = ScanResponse & {
@@ -57,6 +69,48 @@ function isPrivateUrl(value: string): boolean {
 
   const parts = hostname.split(".").map((part) => Number(part));
   return parts.some((part) => Number.isNaN(part) || part < 0 || part > 255);
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+async function runLighthouseAudit(
+  targetUrl: string,
+): Promise<LighthouseMetrics> {
+  const chrome = await chromeLauncher.launch({
+    chromePath: chromium.executablePath(),
+    chromeFlags: ["--headless", "--no-sandbox", "--disable-dev-shm-usage"],
+  });
+
+  try {
+    const result = await lighthouse(targetUrl, {
+      port: chrome.port,
+      output: "json",
+      logLevel: "error",
+      disableStorageReset: true,
+    });
+
+    const categories = result?.lhr?.categories ?? {};
+    return {
+      performance: clampScore(
+        categories.performance?.score ? categories.performance.score * 100 : 0,
+      ),
+      accessibility: clampScore(
+        categories.accessibility?.score
+          ? categories.accessibility.score * 100
+          : 0,
+      ),
+      bestPractices: clampScore(
+        categories["best-practices"]?.score
+          ? categories["best-practices"].score * 100
+          : 0,
+      ),
+      seo: clampScore(categories.seo?.score ? categories.seo.score * 100 : 0),
+    };
+  } finally {
+    await chrome.kill();
+  }
 }
 
 function validateUrl(value: string): string | null {
@@ -139,6 +193,37 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
     const finalUrl = page.url();
     const pageTitle = await page.title();
     const httpStatus = response?.status() ?? 0;
+    const lighthouseMetrics = await runLighthouseAudit(targetUrl);
+    const screenshots = [
+      {
+        kind: "desktop" as const,
+        dataUrl: await page
+          .screenshot({ fullPage: false, type: "png" })
+          .then(
+            (buffer) => `data:image/png;base64,${buffer.toString("base64")}`,
+          ),
+        note: "Desktop screenshot captured with Playwright",
+      },
+      {
+        kind: "mobile" as const,
+        dataUrl: await page
+          .setViewportSize({ width: 390, height: 844 })
+          .then(async () => {
+            await page
+              .goto(targetUrl, {
+                waitUntil: "domcontentloaded",
+                timeout: 30000,
+              })
+              .catch(() => undefined);
+            const buffer = await page.screenshot({
+              fullPage: false,
+              type: "png",
+            });
+            return `data:image/png;base64,${buffer.toString("base64")}`;
+          }),
+        note: "Mobile screenshot captured with Playwright",
+      },
+    ];
 
     return {
       url: targetUrl,
@@ -156,6 +241,8 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
               candidate.url === item.url && candidate.status === item.status,
           ),
       ),
+      lighthouseMetrics,
+      screenshots,
     };
   } finally {
     await browser.close();
@@ -178,6 +265,22 @@ export async function POST(request: Request) {
 
     const scanResult = await collectScanData(targetUrl);
     const analysis = buildFallbackAnalysis(scanResult);
+    const scanReport = buildScanReport(scanResult);
+    const lighthouseAudit = buildLighthouseAudit(scanResult);
+    const pdfReport = await buildPdfReport(
+      "Launch Check Report",
+      scanReport.summary,
+      lighthouseAudit.opportunities.map((opportunity) => opportunity.title),
+      (scanResult.screenshots ?? []).map((screenshot) => screenshot.dataUrl),
+      {
+        score: lighthouseAudit.performance,
+        details: [
+          `Accessibility: ${lighthouseAudit.accessibility}`,
+          `Best Practices: ${lighthouseAudit.bestPractices}`,
+          `SEO: ${lighthouseAudit.seo}`,
+        ],
+      },
+    );
     const crawlConfig = getSafeCrawlConfig(body.crawlConfig?.maxPages ?? 1);
     const crawlResult = buildCrawlResult(
       [targetUrl],
@@ -197,6 +300,7 @@ export async function POST(request: Request) {
       ...scanResult,
       analysis,
       crawlSummary,
+      pdfReport,
     } satisfies ScanResponseWithAnalysis & { crawlSummary?: string });
   } catch {
     return Response.json(

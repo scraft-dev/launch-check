@@ -27,3 +27,27 @@ test("builds lighthouse scores and opportunities from scan results", () => {
   assert.equal(audit.seo, 90);
   assert.match(audit.opportunities[0].title, /console/i);
 });
+
+test("uses browser-derived audit metrics when present", () => {
+  const audit = buildLighthouseAudit({
+    url: "https://example.com",
+    finalUrl: "https://example.com",
+    pageTitle: "Example",
+    httpStatus: 200,
+    loadTime: 1800,
+    consoleErrors: [],
+    pageErrors: [],
+    failedRequests: [],
+    lighthouseMetrics: {
+      performance: 92,
+      accessibility: 95,
+      bestPractices: 90,
+      seo: 89,
+    },
+  } as never);
+
+  assert.equal(audit.performance, 92);
+  assert.equal(audit.accessibility, 95);
+  assert.equal(audit.bestPractices, 90);
+  assert.equal(audit.seo, 89);
+});

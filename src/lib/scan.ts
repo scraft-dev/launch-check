@@ -1,3 +1,5 @@
+import type { LighthouseMetrics } from "./lighthouse";
+
 export type ScanResponse = {
   url: string;
   finalUrl: string;
@@ -12,6 +14,23 @@ export type ScanResponse = {
     status: number;
     error: string;
   }>;
+  lighthouseMetrics?: LighthouseMetrics;
+  screenshots?: Array<{
+    kind: "desktop" | "mobile";
+    dataUrl: string;
+    note: string;
+  }>;
+  pdfReport?: PdfReportPayload;
+};
+
+export type PdfReportPayload = {
+  title: string;
+  summary: string;
+  findings: string[];
+  screenshots: string[];
+  score?: number;
+  details?: string[];
+  pdfBase64: string;
 };
 
 export type ScanErrorResponse = {
