@@ -13,6 +13,9 @@ import {
 import type { ScanAnalysis } from "@/lib/ai-analysis";
 import { saveScanToHistory } from "@/lib/user-history";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
+import { buildLighthouseAudit } from "@/lib/lighthouse";
+import { createScreenshotArtifacts } from "@/lib/screenshots";
+import { buildPdfReport, createPdfDownloadUrl } from "@/lib/pdf";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -23,6 +26,9 @@ export default function Home() {
   >(null);
   const [crawlSummary, setCrawlSummary] = useState<string | null>(null);
   const [multiPageEnabled, setMultiPageEnabled] = useState(false);
+  const [lighthouseAudit, setLighthouseAudit] = useState<ReturnType<typeof buildLighthouseAudit> | null>(null);
+  const [screenshots, setScreenshots] = useState<ReturnType<typeof createScreenshotArtifacts>>([]);
+  const [pdfReport, setPdfReport] = useState<ReturnType<typeof buildPdfReport> | null>(null);
 
   const scanReport = useMemo(() => {
     if (!scanResult) {
@@ -46,6 +52,9 @@ export default function Home() {
     setError("");
     setScanResult(null);
     setCrawlSummary(null);
+    setLighthouseAudit(null);
+    setScreenshots([]);
+    setPdfReport(null);
     setIsScanning(true);
 
     try {
@@ -79,6 +88,17 @@ export default function Home() {
           crawlSummary?: string;
         };
         setScanResult(nextScanResult);
+        const nextLighthouseAudit = buildLighthouseAudit(nextScanResult);
+        const nextScreenshots = createScreenshotArtifacts(nextScanResult.finalUrl);
+        const nextPdfReport = buildPdfReport(
+          "Launch Check Report",
+          buildScanReport(nextScanResult).summary,
+          nextLighthouseAudit.opportunities.map((opportunity) => opportunity.title),
+          nextScreenshots.map((screenshot) => screenshot.url),
+        );
+        setLighthouseAudit(nextLighthouseAudit);
+        setScreenshots(nextScreenshots);
+        setPdfReport(nextPdfReport);
         const crawlResult = buildCrawlResult(
           [trimmedUrl],
           [
@@ -115,6 +135,9 @@ export default function Home() {
     setScanResult(null);
     setCrawlSummary(null);
     setMultiPageEnabled(false);
+    setLighthouseAudit(null);
+    setScreenshots([]);
+    setPdfReport(null);
   }
 
   function handleExport() {
@@ -296,6 +319,83 @@ export default function Home() {
                   {scanReport.summary}
                 </p>
               </div>
+
+              {lighthouseAudit ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Lighthouse scores
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {[
+                      ["Performance", lighthouseAudit.performance],
+                      ["Accessibility", lighthouseAudit.accessibility],
+                      ["Best Practices", lighthouseAudit.bestPractices],
+                      ["SEO", lighthouseAudit.seo],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl bg-white p-3">
+                        <p className="text-sm text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-semibold text-slate-900">
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {lighthouseAudit.opportunities.length > 0 ? (
+                    <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                      {lighthouseAudit.opportunities.map((opportunity) => (
+                        <li
+                          key={opportunity.title}
+                          className="rounded-lg bg-white p-3"
+                        >
+                          <p className="font-medium text-slate-900">
+                            {opportunity.title}
+                          </p>
+                          <p>{opportunity.detail}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {screenshots.length > 0 ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Screenshots
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {screenshots.map((screenshot) => (
+                      <li
+                        key={screenshot.id}
+                        className="rounded-lg bg-white p-3"
+                      >
+                        <p className="font-medium text-slate-900">
+                          {screenshot.kind}
+                        </p>
+                        <p>{screenshot.note}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {pdfReport ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    PDF report
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {pdfReport.summary}
+                  </p>
+                  <a
+                    className="mt-3 inline-flex rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                    href={createPdfDownloadUrl(pdfReport)}
+                    download="launch-check-report.txt"
+                  >
+                    Download report preview
+                  </a>
+                </div>
+              ) : null}
 
               {scanResult.analysis ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
