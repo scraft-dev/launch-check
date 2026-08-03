@@ -33,7 +33,8 @@ export async function POST(
     );
     return NextResponse.json(member, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to invite member";
+    const message =
+      error instanceof Error ? error.message : "Unable to invite member";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

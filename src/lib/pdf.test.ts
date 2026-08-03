@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { buildPdfReport, createPdfDownloadUrl } from "./pdf";
 
 test("builds a PDF report payload from scan content", async () => {
-  const report = await buildPdfReport("Launch Check", "Healthy", ["No issues"], ["desktop.png"]);
+  const report = await buildPdfReport(
+    "Launch Check",
+    "Healthy",
+    ["No issues"],
+    ["desktop.png"],
+  );
 
   assert.equal(report.title, "Launch Check");
   assert.equal(report.findings.length, 1);

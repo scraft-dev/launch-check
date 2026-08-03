@@ -26,7 +26,8 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(workspace, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create workspace";
+    const message =
+      error instanceof Error ? error.message : "Unable to create workspace";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -42,7 +43,8 @@ export async function PATCH(request: Request) {
     );
     return NextResponse.json(workspace);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update workspace";
+    const message =
+      error instanceof Error ? error.message : "Unable to update workspace";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -57,7 +59,8 @@ export async function DELETE(request: Request) {
     );
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to delete workspace";
+    const message =
+      error instanceof Error ? error.message : "Unable to delete workspace";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

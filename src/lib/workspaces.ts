@@ -142,8 +142,7 @@ export class WorkspaceService {
     const next: Workspace = {
       ...workspace,
       name: updates.name?.trim() || workspace.name,
-      shareScanHistory:
-        updates.shareScanHistory ?? workspace.shareScanHistory,
+      shareScanHistory: updates.shareScanHistory ?? workspace.shareScanHistory,
       settings: {
         ...workspace.settings,
         ...(updates.settings ?? {}),

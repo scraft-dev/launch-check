@@ -21,7 +21,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const provider = body.provider as IntegrationProvider | undefined;
-    const payload = typeof body.payload === "string" ? body.payload : JSON.stringify(body.payload ?? {});
+    const payload =
+      typeof body.payload === "string"
+        ? body.payload
+        : JSON.stringify(body.payload ?? {});
     const headers = (body.headers ?? {}) as Record<string, string | undefined>;
     const secret = readSecret(
       provider === "github"
@@ -32,16 +35,30 @@ export async function POST(request: Request) {
     );
 
     if (!provider || !["github", "slack", "discord"].includes(provider)) {
-      return NextResponse.json({ error: "Unsupported integration provider" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unsupported integration provider" },
+        { status: 400 },
+      );
     }
 
     if (!secret) {
-      return NextResponse.json({ error: "External credentials are required for live delivery" }, { status: 400 });
+      return NextResponse.json(
+        { error: "External credentials are required for live delivery" },
+        { status: 400 },
+      );
     }
 
-    const validation = validateWebhookSignature(provider, payload, headers, secret);
+    const validation = validateWebhookSignature(
+      provider,
+      payload,
+      headers,
+      secret,
+    );
     if (!validation.valid) {
-      return NextResponse.json({ error: validation.error ?? "Webhook validation failed" }, { status: 400 });
+      return NextResponse.json(
+        { error: validation.error ?? "Webhook validation failed" },
+        { status: 400 },
+      );
     }
 
     const integration = createIntegration({
@@ -56,7 +73,10 @@ export async function POST(request: Request) {
       ownerId: body.ownerId ?? "system",
       shareScanHistory: body.shareScanHistory ?? true,
     });
-    inviteWorkspaceMember(workspace, { email: body.memberEmail ?? "ops@example.com", role: body.memberRole ?? "viewer" });
+    inviteWorkspaceMember(workspace, {
+      email: body.memberEmail ?? "ops@example.com",
+      role: body.memberRole ?? "viewer",
+    });
     const repository = createGitHubRepositoryConnection({
       repository: body.repository ?? "example/repo",
       installationId: body.installationId ?? "install-demo",
@@ -64,16 +84,28 @@ export async function POST(request: Request) {
     });
     const issueDraft = createGitHubIssueDraft(
       repository,
-      [{ title: body.issueTitle ?? "Scan failure", detail: body.issueDetail ?? "Needs review" }],
+      [
+        {
+          title: body.issueTitle ?? "Scan failure",
+          detail: body.issueDetail ?? "Needs review",
+        },
+      ],
       body.issueLabel ?? "launch-check",
     );
-    const prStatus = createPullRequestStatusCheck(body.context ?? "launch-check", body.state ?? "success");
+    const prStatus = createPullRequestStatusCheck(
+      body.context ?? "launch-check",
+      body.state ?? "success",
+    );
     const notifications = createNotificationSettings({
       notifyOnCompletion: body.notifyOnCompletion ?? true,
       notifyOnCriticalAlert: body.notifyOnCriticalAlert ?? true,
       retryCount: body.retryCount ?? 2,
     });
-    const delivery = createWebhookDelivery(integration.id, body.eventType ?? "scan:completed", provider);
+    const delivery = createWebhookDelivery(
+      integration.id,
+      body.eventType ?? "scan:completed",
+      provider,
+    );
 
     return NextResponse.json({
       integration,
@@ -83,9 +115,13 @@ export async function POST(request: Request) {
       prStatus,
       notifications,
       delivery,
-      message: "Webhook validated server-side; live delivery is pending external credentials",
+      message:
+        "Webhook validated server-side; live delivery is pending external credentials",
     });
   } catch {
-    return NextResponse.json({ error: "Unable to process integrations request" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unable to process integrations request" },
+      { status: 500 },
+    );
   }
 }

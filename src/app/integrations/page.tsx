@@ -18,7 +18,8 @@ const providers: Array<{ id: IntegrationProvider; label: string }> = [
 ];
 
 export default function IntegrationsPage() {
-  const [selectedProvider, setSelectedProvider] = useState<IntegrationProvider>("github");
+  const [selectedProvider, setSelectedProvider] =
+    useState<IntegrationProvider>("github");
   const [integrations, setIntegrations] = useState(() => [
     createIntegration({
       name: "Release notifications",
@@ -28,7 +29,10 @@ export default function IntegrationsPage() {
     }),
   ]);
 
-  const summary = useMemo(() => integrations.map(buildIntegrationSummary).join("\n"), [integrations]);
+  const summary = useMemo(
+    () => integrations.map(buildIntegrationSummary).join("\n"),
+    [integrations],
+  );
 
   function addIntegration() {
     const next = createIntegration({
@@ -53,22 +57,36 @@ export default function IntegrationsPage() {
       },
       "demo-secret",
     );
-    alert(result.valid ? "Webhook validation passed locally" : `Webhook validation failed: ${result.error}`);
+    alert(
+      result.valid
+        ? "Webhook validation passed locally"
+        : `Webhook validation failed: ${result.error}`,
+    );
   }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Integrations</p>
-          <h1 className="mt-3 text-3xl font-semibold">Connected delivery and webhooks</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
+            Integrations
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold">
+            Connected delivery and webhooks
+          </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            This screen models GitHub App, Slack, and Discord integrations without sending real messages. External credentials are required for live delivery,
-            so the UI clearly shows the pending state and the validation rules that will be enforced once secrets are configured.
+            This screen models GitHub App, Slack, and Discord integrations
+            without sending real messages. External credentials are required for
+            live delivery, so the UI clearly shows the pending state and the
+            validation rules that will be enforced once secrets are configured.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/" className="text-sm font-medium text-blue-600">Back to Home</Link>
-            <Link href="/docs" className="text-sm font-medium text-blue-600">Read docs</Link>
+            <Link href="/" className="text-sm font-medium text-blue-600">
+              Back to Home
+            </Link>
+            <Link href="/docs" className="text-sm font-medium text-blue-600">
+              Read docs
+            </Link>
           </div>
         </section>
 
@@ -79,7 +97,9 @@ export default function IntegrationsPage() {
               <select
                 className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
                 value={selectedProvider}
-                onChange={(event) => setSelectedProvider(event.target.value as IntegrationProvider)}
+                onChange={(event) =>
+                  setSelectedProvider(event.target.value as IntegrationProvider)
+                }
               >
                 {providers.map((provider) => (
                   <option key={provider.id} value={provider.id}>
@@ -107,21 +127,38 @@ export default function IntegrationsPage() {
             <ul className="mt-4 space-y-3">
               {integrations.map((integration) => {
                 const canSend = canPerformAction(integration, "send");
-                const delivery = createWebhookDelivery(integration.id, "scan:completed");
+                const delivery = createWebhookDelivery(
+                  integration.id,
+                  "scan:completed",
+                );
                 return (
-                  <li key={integration.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <li
+                    key={integration.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-900">{integration.name}</p>
-                        <p className="text-sm text-slate-600">{integration.provider.toUpperCase()} · {integration.channel}</p>
+                        <p className="font-semibold text-slate-900">
+                          {integration.name}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {integration.provider.toUpperCase()} ·{" "}
+                          {integration.channel}
+                        </p>
                       </div>
                       <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-700">
                         {integration.status}
                       </span>
                     </div>
-                    <p className="mt-3 text-sm text-slate-600">{buildIntegrationSummary(integration)}</p>
-                    <p className="mt-2 text-sm text-slate-600">Webhook delivery: {delivery.status} ({delivery.eventType})</p>
-                    <p className="mt-2 text-sm text-slate-600">Can send: {canSend ? "yes" : "requires write permission"}</p>
+                    <p className="mt-3 text-sm text-slate-600">
+                      {buildIntegrationSummary(integration)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Webhook delivery: {delivery.status} ({delivery.eventType})
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Can send: {canSend ? "yes" : "requires write permission"}
+                    </p>
                   </li>
                 );
               })}
@@ -131,7 +168,9 @@ export default function IntegrationsPage() {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Status summary</h2>
-          <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-950 p-4 text-sm text-slate-100">{summary}</pre>
+          <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-950 p-4 text-sm text-slate-100">
+            {summary}
+          </pre>
         </section>
       </div>
     </main>

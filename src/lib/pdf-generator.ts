@@ -23,7 +23,9 @@ function dataUrlToBuffer(dataUrl: string): Buffer {
   return Buffer.from(encoded, "base64");
 }
 
-export async function buildPdfBuffer(input: PdfGenerationInput): Promise<Buffer> {
+export async function buildPdfBuffer(
+  input: PdfGenerationInput,
+): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: 40 });
   const chunks: Buffer[] = [];
 

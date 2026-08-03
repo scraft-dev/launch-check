@@ -40,7 +40,10 @@ export function createScreenshotArtifacts(
   ];
 }
 
-export function pruneScreenshotArtifacts(artifacts: ScreenshotArtifact[], maxItems = 8): ScreenshotArtifact[] {
+export function pruneScreenshotArtifacts(
+  artifacts: ScreenshotArtifact[],
+  maxItems = 8,
+): ScreenshotArtifact[] {
   return artifacts.slice(0, maxItems);
 }
 
@@ -49,7 +52,10 @@ type ScreenshotStorage = {
   setItem?: (key: string, value: string) => void;
 };
 
-function getStoredValue(storage: ScreenshotStorage | Map<string, string>, key: string): string | null {
+function getStoredValue(
+  storage: ScreenshotStorage | Map<string, string>,
+  key: string,
+): string | null {
   if (storage instanceof Map) {
     return storage.get(key) ?? null;
   }
@@ -57,7 +63,11 @@ function getStoredValue(storage: ScreenshotStorage | Map<string, string>, key: s
   return storage.getItem?.(key) ?? null;
 }
 
-function setStoredValue(storage: ScreenshotStorage | Map<string, string>, key: string, value: string): void {
+function setStoredValue(
+  storage: ScreenshotStorage | Map<string, string>,
+  key: string,
+  value: string,
+): void {
   if (storage instanceof Map) {
     storage.set(key, value);
     return;
@@ -71,7 +81,11 @@ export function persistScreenshotArtifacts(
   storage: ScreenshotStorage | Map<string, string> = window.localStorage,
 ): ScreenshotArtifact[] {
   const nextArtifacts = pruneScreenshotArtifacts(artifacts);
-  setStoredValue(storage, SCREENSHOT_STORAGE_KEY, JSON.stringify(nextArtifacts));
+  setStoredValue(
+    storage,
+    SCREENSHOT_STORAGE_KEY,
+    JSON.stringify(nextArtifacts),
+  );
   return nextArtifacts;
 }
 
