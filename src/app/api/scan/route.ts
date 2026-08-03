@@ -1,9 +1,18 @@
+import crypto from "node:crypto";
 import { chromium, type Browser, type Page } from "playwright";
 import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
 import { buildPdfReport } from "@/lib/pdf";
 import { buildScanReport, type PdfReportPayload } from "@/lib/scan";
+import {
+  JsonDeliveryLogRepository,
+  JsonNotificationPreferencesRepository,
+} from "@/lib/notification-log";
+import {
+  deliverNotification,
+  readNotificationConfig,
+} from "@/lib/notifications";
 import lighthouse from "lighthouse";
 import * as chromeLauncher from "chrome-launcher";
 
@@ -295,6 +304,42 @@ export async function POST(request: Request) {
     const crawlSummary = body.multiPage
       ? `${crawlResult.summary} (bounded to ${crawlConfig.maxPages} page${crawlConfig.maxPages === 1 ? "" : "s"})`
       : undefined;
+
+    const notificationConfig = readNotificationConfig();
+    if (
+      notificationConfig.slackConfigured ||
+      notificationConfig.discordConfigured
+    ) {
+      const scanId = `scan_${crypto.randomUUID()}`;
+      const score = lighthouseAudit.performance;
+      const kind = score < 50 ? "critical_alert" : "scan_completed";
+      const notification = {
+        kind,
+        scanId,
+        siteUrl: scanResult.finalUrl,
+        score,
+        summary: scanReport.summary,
+        reportUrl: `${new URL(request.url).origin}/history/${scanId}`,
+      } as const;
+      const preferences =
+        await new JsonNotificationPreferencesRepository().get();
+      const deliveryRepository = new JsonDeliveryLogRepository();
+      const providers = [
+        ...(notificationConfig.slackConfigured ? (["slack"] as const) : []),
+        ...(notificationConfig.discordConfigured ? (["discord"] as const) : []),
+      ];
+      await Promise.allSettled(
+        providers.map((provider) =>
+          deliverNotification({
+            provider,
+            notification,
+            preferences,
+            config: notificationConfig,
+            repository: deliveryRepository,
+          }),
+        ),
+      );
+    }
 
     return Response.json({
       ...scanResult,

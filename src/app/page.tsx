@@ -250,6 +250,12 @@ export default function Home() {
               </Link>
               <Link
                 className="text-sm font-medium text-blue-600"
+                href="/notifications"
+              >
+                Team notifications
+              </Link>
+              <Link
+                className="text-sm font-medium text-blue-600"
                 href="/workspaces"
               >
                 Manage workspaces
