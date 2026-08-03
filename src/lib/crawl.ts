@@ -26,6 +26,7 @@ export function normalizeAndDeduplicateUrls(
       if (parsed.origin !== new URL(baseUrl).origin) {
         continue;
       }
+      parsed.hash = "";
       const normalized = parsed.toString();
       if (!seen.has(normalized)) {
         seen.add(normalized);
