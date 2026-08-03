@@ -256,6 +256,12 @@ export default function Home() {
               </Link>
               <Link
                 className="text-sm font-medium text-blue-600"
+                href="/enterprise"
+              >
+                Enterprise administration
+              </Link>
+              <Link
+                className="text-sm font-medium text-blue-600"
                 href="/workspaces"
               >
                 Manage workspaces
