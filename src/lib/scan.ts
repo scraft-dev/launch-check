@@ -29,7 +29,7 @@ export type PdfReportPayload = {
   findings: string[];
   screenshots: string[];
   score?: number;
-  details?: string[];
+  details: string[];
   pdfBase64: string;
 };
 

@@ -6,7 +6,7 @@ export type PdfReport = {
   findings: string[];
   screenshots: string[];
   score?: number;
-  details?: string[];
+  details: string[];
   pdfBase64: string;
 };
 
