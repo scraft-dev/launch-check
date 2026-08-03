@@ -236,10 +236,22 @@ export default function Home() {
               <Link className="text-sm font-medium text-blue-600" href="/docs">
                 Read docs
               </Link>
-              <Link className="text-sm font-medium text-blue-600" href="/integrations">
+              <Link
+                className="text-sm font-medium text-blue-600"
+                href="/integrations"
+              >
                 View integrations
               </Link>
-              <Link className="text-sm font-medium text-blue-600" href="/workspaces">
+              <Link
+                className="text-sm font-medium text-blue-600"
+                href="/github"
+              >
+                Connect GitHub
+              </Link>
+              <Link
+                className="text-sm font-medium text-blue-600"
+                href="/workspaces"
+              >
                 Manage workspaces
               </Link>
             </div>
