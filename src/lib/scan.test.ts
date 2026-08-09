@@ -67,13 +67,24 @@ test("builds a report with score, severity counts, and export JSON", () => {
         error: "Not Found",
       },
     ],
+    qualityFindings: [
+      {
+        id: "missing-title",
+        category: "seo",
+        severity: "high",
+        title: "Page title is missing",
+        detail: "The page has no title.",
+        recommendation: "Add a descriptive title.",
+      },
+    ],
   };
 
   const report = buildScanReport(sampleScan);
-  assert.equal(report.launchScore, 70);
+  assert.equal(report.launchScore, 66);
+  assert.equal(report.severitySummary.high, 1);
   assert.equal(report.severitySummary.medium, 2);
   assert.equal(report.severitySummary.low, 1);
   assert.equal(report.performance.loadTimeLabel, "1.3s");
   assert.equal(report.issues[0].severity, "medium");
-  assert.match(exportScanReport(sampleScan), /"launchScore": 70/);
+  assert.match(exportScanReport(sampleScan), /"launchScore": 66/);
 });

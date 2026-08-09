@@ -1,4 +1,5 @@
 import type { LighthouseMetrics } from "./lighthouse";
+import type { QualityFinding } from "./quality-checks";
 
 export type ScanResponse = {
   url: string;
@@ -15,6 +16,7 @@ export type ScanResponse = {
     error: string;
   }>;
   lighthouseMetrics?: LighthouseMetrics;
+  qualityFindings?: QualityFinding[];
   screenshots?: Array<{
     kind: "desktop" | "mobile";
     dataUrl: string;
@@ -52,6 +54,8 @@ export type ScanReport = {
     severity: IssueSeverity;
     title: string;
     detail: string;
+    category?: string;
+    recommendation?: string;
   }>;
 };
 
@@ -193,11 +197,25 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
     severitySummary.medium += 1;
   }
 
+  for (const finding of scanResult.qualityFindings ?? []) {
+    severitySummary[finding.severity] += 1;
+  }
+
   const totalIssues = Object.values(severitySummary).reduce(
     (sum, count) => sum + count,
     0,
   );
-  const launchScore = Math.max(0, Math.min(100, 100 - totalIssues * 10));
+  const launchScore = Math.max(
+    0,
+    Math.min(
+      100,
+      100 -
+        severitySummary.critical * 25 -
+        severitySummary.high * 15 -
+        severitySummary.medium * 8 -
+        severitySummary.low * 3,
+    ),
+  );
   const loadTimeLabel =
     scanResult.loadTime > 1000
       ? `${(scanResult.loadTime / 1000).toFixed(1)}s`
@@ -240,6 +258,13 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
           },
         ]
       : []),
+    ...(scanResult.qualityFindings ?? []).map((finding) => ({
+      severity: finding.severity,
+      title: finding.title,
+      detail: finding.detail,
+      category: finding.category,
+      recommendation: finding.recommendation,
+    })),
   ];
 
   return {
@@ -248,7 +273,7 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
     summary:
       totalIssues === 0
         ? "Your website looks healthy. No issues were detected."
-        : `Your website looks healthy. ${totalIssues} issue${totalIssues === 1 ? "" : "s"} should be reviewed before launch.`,
+        : `${totalIssues} issue${totalIssues === 1 ? "" : "s"} should be reviewed before launch. Start with the highest-severity findings.`,
     performance: {
       httpStatus: scanResult.httpStatus,
       loadTime: scanResult.loadTime,

@@ -5,6 +5,11 @@ import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
 import { buildPdfReport } from "@/lib/pdf";
+import {
+  buildQualityFindings,
+  type PageQualitySnapshot,
+  type QualityFinding,
+} from "@/lib/quality-checks";
 import { buildScanReport, type PdfReportPayload } from "@/lib/scan";
 import {
   JsonDeliveryLogRepository,
@@ -46,6 +51,7 @@ export type ScanResponse = {
     error: string;
   }>;
   lighthouseMetrics?: LighthouseMetrics;
+  qualityFindings?: QualityFinding[];
   screenshots?: Array<{
     kind: "desktop" | "mobile";
     dataUrl: string;
@@ -229,6 +235,60 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
     const finalUrl = page.url();
     const pageTitle = await page.title();
     const httpStatus = response?.status() ?? 0;
+    const qualitySnapshot = await page.evaluate(() => {
+      const images = Array.from(document.querySelectorAll("img"));
+      const formControls = Array.from(
+        document.querySelectorAll(
+          "input:not([type='hidden']), select, textarea, button",
+        ),
+      ) as Array<
+        | HTMLInputElement
+        | HTMLSelectElement
+        | HTMLTextAreaElement
+        | HTMLButtonElement
+      >;
+      const resourceElements = Array.from(
+        document.querySelectorAll(
+          "script[src], link[href], img[src], video[src], audio[src], source[src]",
+        ),
+      );
+      const mixedContentCount =
+        window.location.protocol === "https:"
+          ? resourceElements.filter((element) => {
+              const value =
+                element.getAttribute("src") ??
+                element.getAttribute("href") ??
+                "";
+              return value.startsWith("http:");
+            }).length
+          : 0;
+
+      return {
+        title: document.title,
+        metaDescription:
+          document
+            .querySelector('meta[name="description"]')
+            ?.getAttribute("content") ?? "",
+        language: document.documentElement.lang,
+        h1Count: document.querySelectorAll("h1").length,
+        imageCount: images.length,
+        imagesMissingAlt: images.filter((image) => !image.hasAttribute("alt"))
+          .length,
+        formControlCount: formControls.length,
+        unlabeledFormControls: formControls.filter((control) => {
+          return !(
+            control.labels?.length ||
+            control.getAttribute("aria-label")?.trim() ||
+            control.getAttribute("aria-labelledby")?.trim()
+          );
+        }).length,
+        hasViewportMeta: Boolean(
+          document.querySelector('meta[name="viewport"]'),
+        ),
+        mixedContentCount,
+      } satisfies PageQualitySnapshot;
+    });
+    const qualityFindings = buildQualityFindings(qualitySnapshot);
     const lighthouseMetrics = process.env.VERCEL
       ? undefined
       : await runLighthouseAudit(targetUrl);
@@ -280,6 +340,7 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
           ),
       ),
       lighthouseMetrics,
+      qualityFindings,
       screenshots,
     };
   } finally {

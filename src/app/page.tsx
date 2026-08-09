@@ -461,18 +461,57 @@ export default function Home() {
 
               {scanReport.issues.length > 0 ? (
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">Issues</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Action plan
+                    </p>
+                    <span className="text-xs font-medium text-slate-500">
+                      {scanReport.issues.length} finding
+                      {scanReport.issues.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
                   <ul className="mt-3 space-y-2 text-sm text-slate-600">
                     {scanReport.issues.map((issue) => (
                       <li
                         key={`${issue.title}-${issue.detail}`}
-                        className="rounded-lg bg-white p-3"
+                        className="rounded-xl border border-slate-100 bg-white p-4"
                       >
-                        <p className="font-medium capitalize text-slate-900">
-                          {issue.severity}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${
+                              issue.severity === "critical"
+                                ? "bg-red-100 text-red-700"
+                                : issue.severity === "high"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : issue.severity === "medium"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {issue.severity}
+                          </span>
+                          {issue.category ? (
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium capitalize text-blue-700">
+                              {issue.category}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 font-semibold text-slate-900">
+                          {issue.title}
                         </p>
-                        <p>{issue.title}</p>
-                        <p className="text-slate-500">{issue.detail}</p>
+                        <p className="mt-1 leading-6 text-slate-600">
+                          {issue.detail}
+                        </p>
+                        {issue.recommendation ? (
+                          <div className="mt-3 rounded-lg bg-blue-50 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                              How to fix
+                            </p>
+                            <p className="mt-1 leading-6 text-blue-950">
+                              {issue.recommendation}
+                            </p>
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
