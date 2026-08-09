@@ -36,5 +36,34 @@ test("builds a crawl summary from discovered pages", () => {
   );
 
   assert.equal(result.queueLength, 1);
-  assert.match(result.summary, /1 internal page/i);
+  assert.equal(result.scannedPages, 2);
+  assert.equal(result.brokenPages, 0);
+  assert.match(result.summary, /2 internal pages scanned/i);
+});
+
+test("summarizes broken pages and page findings", () => {
+  const result = buildCrawlResult(
+    ["https://example.com", "https://example.com/missing"],
+    [
+      { url: "https://example.com", title: "Home", status: 200 },
+      {
+        url: "https://example.com/missing",
+        title: "Missing",
+        status: 404,
+        findings: [
+          {
+            id: "missing-title",
+            category: "seo",
+            severity: "high",
+            title: "Page title is missing",
+            detail: "No title",
+            recommendation: "Add a title",
+          },
+        ],
+      },
+    ],
+  );
+
+  assert.equal(result.brokenPages, 1);
+  assert.equal(result.totalFindings, 1);
 });

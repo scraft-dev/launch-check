@@ -2,7 +2,13 @@ import crypto from "node:crypto";
 import serverlessChromium from "@sparticuz/chromium";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
-import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
+import {
+  buildCrawlResult,
+  getSafeCrawlConfig,
+  normalizeAndDeduplicateUrls,
+  type CrawlConfig,
+  type CrawlResult,
+} from "@/lib/crawl";
 import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
 import { buildPdfReport } from "@/lib/pdf";
 import {
@@ -52,6 +58,7 @@ export type ScanResponse = {
   }>;
   lighthouseMetrics?: LighthouseMetrics;
   qualityFindings?: QualityFinding[];
+  crawlResult?: CrawlResult;
   screenshots?: Array<{
     kind: "desktop" | "mobile";
     dataUrl: string;
@@ -174,7 +181,142 @@ function validateUrl(value: string): string | null {
   return null;
 }
 
-async function collectScanData(targetUrl: string): Promise<ScanResponse> {
+async function collectPageQualitySnapshot(
+  page: Page,
+): Promise<PageQualitySnapshot> {
+  return page.evaluate(() => {
+    const images = Array.from(document.querySelectorAll("img"));
+    const formControls = Array.from(
+      document.querySelectorAll(
+        "input:not([type='hidden']), select, textarea, button",
+      ),
+    ) as Array<
+      | HTMLInputElement
+      | HTMLSelectElement
+      | HTMLTextAreaElement
+      | HTMLButtonElement
+    >;
+    const resourceElements = Array.from(
+      document.querySelectorAll(
+        "script[src], link[href], img[src], video[src], audio[src], source[src]",
+      ),
+    );
+    const mixedContentCount =
+      window.location.protocol === "https:"
+        ? resourceElements.filter((element) => {
+            const value =
+              element.getAttribute("src") ?? element.getAttribute("href") ?? "";
+            return value.startsWith("http:");
+          }).length
+        : 0;
+
+    return {
+      title: document.title,
+      metaDescription:
+        document
+          .querySelector('meta[name="description"]')
+          ?.getAttribute("content") ?? "",
+      language: document.documentElement.lang,
+      h1Count: document.querySelectorAll("h1").length,
+      imageCount: images.length,
+      imagesMissingAlt: images.filter((image) => !image.hasAttribute("alt"))
+        .length,
+      formControlCount: formControls.length,
+      unlabeledFormControls: formControls.filter((control) => {
+        return !(
+          control.labels?.length ||
+          control.getAttribute("aria-label")?.trim() ||
+          control.getAttribute("aria-labelledby")?.trim()
+        );
+      }).length,
+      hasViewportMeta: Boolean(document.querySelector('meta[name="viewport"]')),
+      mixedContentCount,
+    } satisfies PageQualitySnapshot;
+  });
+}
+
+async function collectInternalLinks(page: Page, baseUrl: string) {
+  const hrefs = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("a[href]"), (link) =>
+      link.getAttribute("href"),
+    ).filter((href): href is string => Boolean(href)),
+  );
+
+  return normalizeAndDeduplicateUrls(baseUrl, hrefs);
+}
+
+async function crawlInternalPages(
+  browser: Browser,
+  targetUrl: string,
+  initialPage: {
+    url: string;
+    title: string;
+    status: number;
+    findings: QualityFinding[];
+  },
+  initialLinks: string[],
+  config: CrawlConfig,
+): Promise<CrawlResult> {
+  const visited = new Set([initialPage.url]);
+  const queued = new Set(initialLinks);
+  const queue = initialLinks
+    .filter((url) => url !== initialPage.url)
+    .map((url) => ({ url, depth: 1 }));
+  const pages: CrawlResult["pages"] = [{ ...initialPage, depth: 0 }];
+
+  while (queue.length > 0 && pages.length < config.maxPages) {
+    const next = queue.shift();
+    if (!next || visited.has(next.url) || next.depth > config.maxDepth) {
+      continue;
+    }
+
+    visited.add(next.url);
+    const crawlPage = await browser.newPage();
+
+    try {
+      const response = await crawlPage.goto(next.url, {
+        waitUntil: "domcontentloaded",
+        timeout: 8000,
+      });
+      const finalUrl = crawlPage.url();
+      const qualitySnapshot = await collectPageQualitySnapshot(crawlPage);
+      pages.push({
+        url: finalUrl,
+        title: await crawlPage.title(),
+        status: response?.status() ?? 0,
+        depth: next.depth,
+        findings: buildQualityFindings(qualitySnapshot),
+      });
+
+      if (next.depth < config.maxDepth) {
+        const links = await collectInternalLinks(crawlPage, targetUrl);
+        for (const link of links) {
+          if (!visited.has(link) && !queued.has(link)) {
+            queued.add(link);
+            queue.push({ url: link, depth: next.depth + 1 });
+          }
+        }
+      }
+    } catch {
+      pages.push({
+        url: next.url,
+        title: "Unable to load",
+        status: 0,
+        depth: next.depth,
+        findings: [],
+      });
+    } finally {
+      await crawlPage.close();
+    }
+  }
+
+  return buildCrawlResult([...visited, ...queued], pages);
+}
+
+async function collectScanData(
+  targetUrl: string,
+  crawlConfig?: CrawlConfig,
+): Promise<ScanResponse> {
   const browser: Browser = await chromium.launch(
     await getChromiumLaunchOptions(),
   );
@@ -235,60 +377,11 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
     const finalUrl = page.url();
     const pageTitle = await page.title();
     const httpStatus = response?.status() ?? 0;
-    const qualitySnapshot = await page.evaluate(() => {
-      const images = Array.from(document.querySelectorAll("img"));
-      const formControls = Array.from(
-        document.querySelectorAll(
-          "input:not([type='hidden']), select, textarea, button",
-        ),
-      ) as Array<
-        | HTMLInputElement
-        | HTMLSelectElement
-        | HTMLTextAreaElement
-        | HTMLButtonElement
-      >;
-      const resourceElements = Array.from(
-        document.querySelectorAll(
-          "script[src], link[href], img[src], video[src], audio[src], source[src]",
-        ),
-      );
-      const mixedContentCount =
-        window.location.protocol === "https:"
-          ? resourceElements.filter((element) => {
-              const value =
-                element.getAttribute("src") ??
-                element.getAttribute("href") ??
-                "";
-              return value.startsWith("http:");
-            }).length
-          : 0;
-
-      return {
-        title: document.title,
-        metaDescription:
-          document
-            .querySelector('meta[name="description"]')
-            ?.getAttribute("content") ?? "",
-        language: document.documentElement.lang,
-        h1Count: document.querySelectorAll("h1").length,
-        imageCount: images.length,
-        imagesMissingAlt: images.filter((image) => !image.hasAttribute("alt"))
-          .length,
-        formControlCount: formControls.length,
-        unlabeledFormControls: formControls.filter((control) => {
-          return !(
-            control.labels?.length ||
-            control.getAttribute("aria-label")?.trim() ||
-            control.getAttribute("aria-labelledby")?.trim()
-          );
-        }).length,
-        hasViewportMeta: Boolean(
-          document.querySelector('meta[name="viewport"]'),
-        ),
-        mixedContentCount,
-      } satisfies PageQualitySnapshot;
-    });
+    const qualitySnapshot = await collectPageQualitySnapshot(page);
     const qualityFindings = buildQualityFindings(qualitySnapshot);
+    const initialLinks = crawlConfig
+      ? await collectInternalLinks(page, targetUrl)
+      : [];
     const lighthouseMetrics = process.env.VERCEL
       ? undefined
       : await runLighthouseAudit(targetUrl);
@@ -322,6 +415,20 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
         note: "Mobile screenshot captured with Playwright",
       },
     ];
+    const crawlResult = crawlConfig
+      ? await crawlInternalPages(
+          browser,
+          targetUrl,
+          {
+            url: finalUrl,
+            title: pageTitle,
+            status: httpStatus,
+            findings: qualityFindings,
+          },
+          initialLinks,
+          crawlConfig,
+        )
+      : undefined;
 
     return {
       url: targetUrl,
@@ -341,6 +448,7 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
       ),
       lighthouseMetrics,
       qualityFindings,
+      crawlResult,
       screenshots,
     };
   } finally {
@@ -362,7 +470,10 @@ export async function POST(request: Request) {
       return Response.json({ error: validationError }, { status: 400 });
     }
 
-    const scanResult = await collectScanData(targetUrl);
+    const crawlConfig = body.multiPage
+      ? getSafeCrawlConfig(body.crawlConfig?.maxPages ?? 6)
+      : undefined;
+    const scanResult = await collectScanData(targetUrl, crawlConfig);
     const analysis = buildFallbackAnalysis(scanResult);
     const scanReport = buildScanReport(scanResult);
     const lighthouseAudit = buildLighthouseAudit(scanResult);
@@ -380,19 +491,8 @@ export async function POST(request: Request) {
         ],
       },
     );
-    const crawlConfig = getSafeCrawlConfig(body.crawlConfig?.maxPages ?? 1);
-    const crawlResult = buildCrawlResult(
-      [targetUrl],
-      [
-        {
-          url: scanResult.finalUrl,
-          title: scanResult.pageTitle,
-          status: scanResult.httpStatus,
-        },
-      ],
-    );
-    const crawlSummary = body.multiPage
-      ? `${crawlResult.summary} (bounded to ${crawlConfig.maxPages} page${crawlConfig.maxPages === 1 ? "" : "s"})`
+    const crawlSummary = scanResult.crawlResult
+      ? `${scanResult.crawlResult.summary} ${scanResult.crawlResult.brokenPages} broken page${scanResult.crawlResult.brokenPages === 1 ? "" : "s"}; ${scanResult.crawlResult.totalFindings} quality finding${scanResult.crawlResult.totalFindings === 1 ? "" : "s"}.`
       : undefined;
 
     const notificationConfig = readNotificationConfig();

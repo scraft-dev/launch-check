@@ -1,3 +1,5 @@
+import type { QualityFinding } from "./quality-checks";
+
 export type CrawlConfig = {
   maxPages: number;
   maxDepth: number;
@@ -8,8 +10,13 @@ export type CrawlResult = {
     url: string;
     title: string;
     status: number;
+    depth?: number;
+    findings?: QualityFinding[];
   }>;
   queueLength: number;
+  scannedPages: number;
+  brokenPages: number;
+  totalFindings: number;
   summary: string;
 };
 
@@ -49,17 +56,24 @@ export function getSafeCrawlConfig(maxPages: number): CrawlConfig {
 
 export function buildCrawlResult(
   urls: string[],
-  pages: Array<{ url: string; title: string; status: number }>,
+  pages: CrawlResult["pages"],
 ): CrawlResult {
   const deduped = normalizeAndDeduplicateUrls(urls[0] ?? "", urls);
   const summary =
-    deduped.length > 0
-      ? `${deduped.length} internal page${deduped.length === 1 ? "" : "s"} queued for scanning.`
+    pages.length > 0
+      ? `${pages.length} internal page${pages.length === 1 ? "" : "s"} scanned.`
       : "No internal pages were discovered.";
+  const limitedPages = pages.slice(0, 10);
 
   return {
-    pages: pages.slice(0, 10),
+    pages: limitedPages,
     queueLength: deduped.length,
+    scannedPages: limitedPages.length,
+    brokenPages: limitedPages.filter((page) => page.status >= 400).length,
+    totalFindings: limitedPages.reduce(
+      (total, page) => total + (page.findings?.length ?? 0),
+      0,
+    ),
     summary,
   };
 }

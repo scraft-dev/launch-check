@@ -13,7 +13,11 @@ import {
 } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
 import { saveScanToHistory } from "@/lib/user-history";
-import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
+import {
+  buildCrawlResult,
+  getSafeCrawlConfig,
+  type CrawlResult,
+} from "@/lib/crawl";
 import { buildLighthouseAudit } from "@/lib/lighthouse";
 import { createScreenshotArtifacts } from "@/lib/screenshots";
 
@@ -25,6 +29,7 @@ export default function Home() {
     (ScanResponse & { analysis?: ScanAnalysis }) | null
   >(null);
   const [crawlSummary, setCrawlSummary] = useState<string | null>(null);
+  const [crawlResult, setCrawlResult] = useState<CrawlResult | null>(null);
   const [multiPageEnabled, setMultiPageEnabled] = useState(false);
   const [lighthouseAudit, setLighthouseAudit] = useState<ReturnType<
     typeof buildLighthouseAudit
@@ -56,6 +61,7 @@ export default function Home() {
     setError("");
     setScanResult(null);
     setCrawlSummary(null);
+    setCrawlResult(null);
     setLighthouseAudit(null);
     setScreenshots([]);
     setPdfReport(null);
@@ -107,7 +113,7 @@ export default function Home() {
         setLighthouseAudit(nextLighthouseAudit);
         setScreenshots(nextScreenshots);
         setPdfReport(nextScanResult.pdfReport ?? null);
-        const crawlResult = buildCrawlResult(
+        const fallbackCrawlResult = buildCrawlResult(
           [trimmedUrl],
           [
             {
@@ -117,7 +123,10 @@ export default function Home() {
             },
           ],
         );
-        setCrawlSummary(nextScanResult.crawlSummary ?? crawlResult.summary);
+        setCrawlSummary(
+          nextScanResult.crawlSummary ?? fallbackCrawlResult.summary,
+        );
+        setCrawlResult(nextScanResult.crawlResult ?? null);
 
         saveScanToHistory({
           url: nextScanResult.url,
@@ -142,6 +151,7 @@ export default function Home() {
     setIsScanning(false);
     setScanResult(null);
     setCrawlSummary(null);
+    setCrawlResult(null);
     setMultiPageEnabled(false);
     setLighthouseAudit(null);
     setScreenshots([]);
@@ -335,6 +345,56 @@ export default function Home() {
                   {scanResult.failedRequests.length}
                 </p>
               </div>
+
+              {crawlResult ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Pages scanned
+                    </p>
+                    <div className="flex gap-2 text-xs font-medium">
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-700">
+                        {crawlResult.scannedPages} pages
+                      </span>
+                      <span className="rounded-full bg-red-100 px-2.5 py-1 text-red-700">
+                        {crawlResult.brokenPages} broken
+                      </span>
+                    </div>
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {crawlResult.pages.map((page) => (
+                      <li
+                        key={page.url}
+                        className="rounded-xl border border-slate-100 bg-white p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-900">
+                              {page.title || "Untitled page"}
+                            </p>
+                            <p className="mt-1 break-all text-xs text-slate-500">
+                              {page.url}
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              page.status >= 400 || page.status === 0
+                                ? "bg-red-100 text-red-700"
+                                : "bg-green-100 text-green-700"
+                            }`}
+                          >
+                            {page.status || "Failed"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Depth {page.depth ?? 0} · {page.findings?.length ?? 0}{" "}
+                          quality findings
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {(["critical", "high", "medium", "low"] as const).map(

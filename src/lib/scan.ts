@@ -1,3 +1,4 @@
+import type { CrawlResult } from "./crawl";
 import type { LighthouseMetrics } from "./lighthouse";
 import type { QualityFinding } from "./quality-checks";
 
@@ -17,6 +18,7 @@ export type ScanResponse = {
   }>;
   lighthouseMetrics?: LighthouseMetrics;
   qualityFindings?: QualityFinding[];
+  crawlResult?: CrawlResult;
   screenshots?: Array<{
     kind: "desktop" | "mobile";
     dataUrl: string;
