@@ -276,7 +276,7 @@ async function crawlInternalPages(
     try {
       const response = await crawlPage.goto(next.url, {
         waitUntil: "domcontentloaded",
-        timeout: 8000,
+        timeout: 4000,
       });
       const finalUrl = crawlPage.url();
       const qualitySnapshot = await collectPageQualitySnapshot(crawlPage);
@@ -366,11 +366,11 @@ async function collectScanData(
   try {
     const response = await page.goto(targetUrl, {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
+      timeout: 15000,
     });
 
     await page
-      .waitForLoadState("networkidle", { timeout: 5000 })
+      .waitForLoadState("networkidle", { timeout: 3000 })
       .catch(() => undefined);
 
     const loadTime = Date.now() - startedAt;
@@ -403,7 +403,7 @@ async function collectScanData(
             await page
               .goto(targetUrl, {
                 waitUntil: "domcontentloaded",
-                timeout: 30000,
+                timeout: 5000,
               })
               .catch(() => undefined);
             const buffer = await page.screenshot({
@@ -471,7 +471,7 @@ export async function POST(request: Request) {
     }
 
     const crawlConfig = body.multiPage
-      ? getSafeCrawlConfig(body.crawlConfig?.maxPages ?? 6)
+      ? getSafeCrawlConfig(Math.min(body.crawlConfig?.maxPages ?? 4, 4))
       : undefined;
     const scanResult = await collectScanData(targetUrl, crawlConfig);
     const analysis = buildFallbackAnalysis(scanResult);

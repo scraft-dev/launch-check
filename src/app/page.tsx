@@ -68,7 +68,7 @@ export default function Home() {
     setIsScanning(true);
 
     try {
-      const crawlConfig = getSafeCrawlConfig(multiPageEnabled ? 6 : 1);
+      const crawlConfig = getSafeCrawlConfig(multiPageEnabled ? 4 : 1);
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: {
