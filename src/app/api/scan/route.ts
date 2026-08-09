@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import { chromium, type Browser, type Page } from "playwright";
+import serverlessChromium from "@sparticuz/chromium";
+import { chromium, type Browser, type Page } from "playwright-core";
 import { buildFallbackAnalysis, type ScanAnalysis } from "@/lib/ai-analysis";
 import { buildCrawlResult, getSafeCrawlConfig } from "@/lib/crawl";
 import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
@@ -15,6 +16,23 @@ import {
 } from "@/lib/notifications";
 import lighthouse from "lighthouse";
 import * as chromeLauncher from "chrome-launcher";
+
+export const maxDuration = 60;
+
+async function getChromiumLaunchOptions() {
+  if (process.env.VERCEL) {
+    return {
+      args: serverlessChromium.args,
+      executablePath: await serverlessChromium.executablePath(),
+      headless: true as const,
+    };
+  }
+
+  return {
+    executablePath: chromium.executablePath(),
+    headless: true as const,
+  };
+}
 
 export type ScanResponse = {
   url: string;
@@ -87,9 +105,15 @@ function clampScore(value: number): number {
 async function runLighthouseAudit(
   targetUrl: string,
 ): Promise<LighthouseMetrics> {
+  const launchOptions = await getChromiumLaunchOptions();
   const chrome = await chromeLauncher.launch({
-    chromePath: chromium.executablePath(),
-    chromeFlags: ["--headless", "--no-sandbox", "--disable-dev-shm-usage"],
+    chromePath: launchOptions.executablePath,
+    chromeFlags: [
+      ...(launchOptions.args ?? []),
+      "--headless",
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+    ],
   });
 
   try {
@@ -144,7 +168,9 @@ function validateUrl(value: string): string | null {
 }
 
 async function collectScanData(targetUrl: string): Promise<ScanResponse> {
-  const browser: Browser = await chromium.launch({ headless: true });
+  const browser: Browser = await chromium.launch(
+    await getChromiumLaunchOptions(),
+  );
   const page: Page = await browser.newPage();
 
   const consoleErrors: string[] = [];
