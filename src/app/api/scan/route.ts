@@ -373,7 +373,11 @@ export async function POST(request: Request) {
       crawlSummary,
       pdfReport,
     } satisfies ScanResponseWithAnalysis & { crawlSummary?: string });
-  } catch {
+  } catch (error) {
+    console.error("Website scan failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown scan error",
+    });
     return Response.json(
       { error: "Unable to scan this website right now." },
       { status: 500 },
