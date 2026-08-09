@@ -1,7 +1,19 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["chrome-launcher", "lighthouse", "pdfkit"],
+  serverExternalPackages: [
+    "@sparticuz/chromium",
+    "chrome-launcher",
+    "lighthouse",
+    "pdfkit",
+    "playwright-core",
+  ],
+  outputFileTracingIncludes: {
+    "/api/scan": [
+      "./node_modules/@sparticuz/chromium/**/*",
+      "./node_modules/playwright-core/**/*",
+    ],
+  },
   poweredByHeader: false,
   async headers() {
     return [
