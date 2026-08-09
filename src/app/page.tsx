@@ -562,6 +562,16 @@ export default function Home() {
                         <p className="mt-1 leading-6 text-slate-600">
                           {issue.detail}
                         </p>
+                        {issue.pageUrl ? (
+                          <a
+                            className="mt-2 block break-all text-xs font-medium text-blue-600 hover:underline"
+                            href={issue.pageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {issue.pageUrl}
+                          </a>
+                        ) : null}
                         {issue.recommendation ? (
                           <div className="mt-3 rounded-lg bg-blue-50 p-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">

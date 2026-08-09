@@ -88,3 +88,71 @@ test("builds a report with score, severity counts, and export JSON", () => {
   assert.equal(report.issues[0].severity, "medium");
   assert.match(exportScanReport(sampleScan), /"launchScore": 66/);
 });
+
+test("includes findings and broken links from crawled pages without duplicating the main page", () => {
+  const sampleScan: ScanResponse = {
+    url: "https://example.com",
+    finalUrl: "https://example.com/",
+    pageTitle: "Example",
+    httpStatus: 200,
+    loadTime: 400,
+    consoleErrors: [],
+    pageErrors: [],
+    failedRequests: [],
+    qualityFindings: [],
+    crawlResult: {
+      queueLength: 3,
+      scannedPages: 3,
+      brokenPages: 1,
+      totalFindings: 2,
+      summary: "3 internal pages scanned.",
+      pages: [
+        {
+          url: "https://example.com/#top",
+          title: "Example",
+          status: 200,
+          findings: [
+            {
+              id: "main-duplicate",
+              category: "seo",
+              severity: "low",
+              title: "Main page duplicate",
+              detail: "Should not be counted twice.",
+              recommendation: "None.",
+            },
+          ],
+        },
+        {
+          url: "https://example.com/about",
+          title: "About",
+          status: 200,
+          findings: [
+            {
+              id: "missing-description",
+              category: "seo",
+              severity: "medium",
+              title: "Meta description is missing",
+              detail: "No description.",
+              recommendation: "Add a description.",
+            },
+          ],
+        },
+        {
+          url: "https://example.com/missing",
+          title: "",
+          status: 404,
+          findings: [],
+        },
+      ],
+    },
+  };
+
+  const report = buildScanReport(sampleScan);
+  assert.equal(report.launchScore, 77);
+  assert.equal(report.severitySummary.high, 1);
+  assert.equal(report.severitySummary.medium, 1);
+  assert.equal(report.severitySummary.low, 0);
+  assert.equal(report.issues.length, 2);
+  assert.equal(report.issues[0].pageUrl, "https://example.com/about");
+  assert.equal(report.issues[1].pageUrl, "https://example.com/missing");
+});

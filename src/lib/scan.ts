@@ -58,8 +58,19 @@ export type ScanReport = {
     detail: string;
     category?: string;
     recommendation?: string;
+    pageUrl?: string;
   }>;
 };
+
+function normalizePageUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
 
 export function getUrlValidationError(value: string): string | null {
   const trimmedValue = value.trim();
@@ -199,7 +210,49 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
     severitySummary.medium += 1;
   }
 
-  for (const finding of scanResult.qualityFindings ?? []) {
+  const mainPageUrl = normalizePageUrl(scanResult.finalUrl);
+  const crawledPageIssues = (scanResult.crawlResult?.pages ?? []).flatMap(
+    (page) => {
+      if (normalizePageUrl(page.url) === mainPageUrl) {
+        return [];
+      }
+
+      const statusIssue =
+        page.status === 0 || page.status >= 400
+          ? [
+              {
+                severity: "high" as IssueSeverity,
+                title: "Internal page is unavailable",
+                detail:
+                  page.status === 0
+                    ? "The page could not be reached during the crawl."
+                    : `Received HTTP ${page.status}.`,
+                category: "availability",
+                recommendation:
+                  "Restore the page or update links that point to this URL.",
+                pageUrl: page.url,
+              },
+            ]
+          : [];
+
+      return [
+        ...statusIssue,
+        ...(page.findings ?? []).map((finding) => ({
+          severity: finding.severity,
+          title: finding.title,
+          detail: finding.detail,
+          category: finding.category,
+          recommendation: finding.recommendation,
+          pageUrl: page.url,
+        })),
+      ];
+    },
+  );
+
+  for (const finding of [
+    ...(scanResult.qualityFindings ?? []),
+    ...crawledPageIssues,
+  ]) {
     severitySummary[finding.severity] += 1;
   }
 
@@ -266,7 +319,9 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
       detail: finding.detail,
       category: finding.category,
       recommendation: finding.recommendation,
+      pageUrl: scanResult.finalUrl,
     })),
+    ...crawledPageIssues,
   ];
 
   return {
