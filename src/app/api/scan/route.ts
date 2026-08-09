@@ -245,8 +245,63 @@ async function collectInternalLinks(page: Page, baseUrl: string) {
   return normalizeAndDeduplicateUrls(baseUrl, hrefs);
 }
 
+function getAttribute(tag: string, name: string): string {
+  const match = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, "i"));
+  return match?.[1] ?? "";
+}
+
+function collectHtmlQualitySnapshot(
+  html: string,
+  pageUrl: string,
+): PageQualitySnapshot {
+  const title =
+    html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? "";
+  const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
+  const descriptionTag = metaTags.find(
+    (tag) => getAttribute(tag, "name").toLowerCase() === "description",
+  );
+  const htmlTag = html.match(/<html\b[^>]*>/i)?.[0] ?? "";
+  const imageTags = html.match(/<img\b[^>]*>/gi) ?? [];
+  const formControls =
+    html.match(/<(?:input|select|textarea|button)\b[^>]*>/gi) ?? [];
+
+  return {
+    title,
+    metaDescription: descriptionTag
+      ? getAttribute(descriptionTag, "content")
+      : "",
+    language: getAttribute(htmlTag, "lang"),
+    h1Count: (html.match(/<h1\b[^>]*>/gi) ?? []).length,
+    imageCount: imageTags.length,
+    imagesMissingAlt: imageTags.filter(
+      (tag) => !/\salt\s*=\s*["'][^"']*["']/i.test(tag),
+    ).length,
+    formControlCount: formControls.length,
+    unlabeledFormControls: formControls.filter(
+      (tag) =>
+        !getAttribute(tag, "aria-label").trim() &&
+        !getAttribute(tag, "aria-labelledby").trim() &&
+        !getAttribute(tag, "id").trim(),
+    ).length,
+    hasViewportMeta: metaTags.some(
+      (tag) => getAttribute(tag, "name").toLowerCase() === "viewport",
+    ),
+    mixedContentCount:
+      new URL(pageUrl).protocol === "https:"
+        ? (html.match(/(?:src|href)\s*=\s*["']http:\/\//gi) ?? []).length
+        : 0,
+  };
+}
+
+function collectHtmlLinks(html: string, baseUrl: string): string[] {
+  const hrefs = Array.from(
+    html.matchAll(/<a\b[^>]*\shref\s*=\s*["']([^"']+)["']/gi),
+    (match) => match[1],
+  );
+  return normalizeAndDeduplicateUrls(baseUrl, hrefs);
+}
+
 async function crawlInternalPages(
-  browser: Browser,
   targetUrl: string,
   initialPage: {
     url: string;
@@ -271,25 +326,30 @@ async function crawlInternalPages(
     }
 
     visited.add(next.url);
-    const crawlPage = await browser.newPage();
-
     try {
-      const response = await crawlPage.goto(next.url, {
-        waitUntil: "domcontentloaded",
-        timeout: 4000,
+      const response = await fetch(next.url, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(4000),
+        headers: {
+          "User-Agent":
+            "LaunchCheckBot/1.0 (+https://launch-check-five.vercel.app)",
+        },
       });
-      const finalUrl = crawlPage.url();
-      const qualitySnapshot = await collectPageQualitySnapshot(crawlPage);
+      const contentType = response.headers.get("content-type") ?? "";
+      const html = contentType.includes("text/html")
+        ? await response.text()
+        : "";
+      const qualitySnapshot = collectHtmlQualitySnapshot(html, next.url);
       pages.push({
-        url: finalUrl,
-        title: await crawlPage.title(),
-        status: response?.status() ?? 0,
+        url: next.url,
+        title: qualitySnapshot.title || `HTTP ${response.status}`,
+        status: response.status,
         depth: next.depth,
         findings: buildQualityFindings(qualitySnapshot),
       });
 
-      if (next.depth < config.maxDepth) {
-        const links = await collectInternalLinks(crawlPage, targetUrl);
+      if (html && next.depth < config.maxDepth) {
+        const links = collectHtmlLinks(html, targetUrl);
         for (const link of links) {
           if (!visited.has(link) && !queued.has(link)) {
             queued.add(link);
@@ -305,8 +365,6 @@ async function crawlInternalPages(
         depth: next.depth,
         findings: [],
       });
-    } finally {
-      await crawlPage.close();
     }
   }
 
@@ -417,8 +475,7 @@ async function collectScanData(
     ];
     const crawlResult = crawlConfig
       ? await crawlInternalPages(
-          browser,
-          targetUrl,
+          finalUrl,
           {
             url: finalUrl,
             title: pageTitle,
