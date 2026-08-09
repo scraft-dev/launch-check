@@ -209,6 +209,12 @@ async function collectPageQualitySnapshot(
             return value.startsWith("http:");
           }).length
         : 0;
+    const links = Array.from(document.querySelectorAll("a[href]"));
+    const robotsContent = Array.from(
+      document.querySelectorAll('meta[name="robots"], meta[name="googlebot"]'),
+    )
+      .map((meta) => meta.getAttribute("content") ?? "")
+      .join(",");
 
     return {
       title: document.title,
@@ -226,11 +232,31 @@ async function collectPageQualitySnapshot(
         return !(
           control.labels?.length ||
           control.getAttribute("aria-label")?.trim() ||
-          control.getAttribute("aria-labelledby")?.trim()
+          control.getAttribute("aria-labelledby")?.trim() ||
+          control.getAttribute("title")?.trim() ||
+          control.textContent?.trim() ||
+          (control instanceof HTMLInputElement &&
+            (["button", "submit", "reset"].includes(control.type) ||
+              control.type === "image") &&
+            (control.value.trim() || control.alt.trim()))
         );
       }).length,
       hasViewportMeta: Boolean(document.querySelector('meta[name="viewport"]')),
       mixedContentCount,
+      canonicalUrl:
+        document
+          .querySelector('link[rel~="canonical"]')
+          ?.getAttribute("href") ?? "",
+      isNoIndex: /(?:^|[\s,])noindex(?:[\s,]|$)/i.test(robotsContent),
+      linkCount: links.length,
+      unlabeledLinks: links.filter(
+        (link) =>
+          !link.textContent?.trim() &&
+          !link.getAttribute("aria-label")?.trim() &&
+          !link.getAttribute("aria-labelledby")?.trim() &&
+          !link.getAttribute("title")?.trim() &&
+          !link.querySelector("img[alt]:not([alt=''])"),
+      ).length,
     } satisfies PageQualitySnapshot;
   });
 }
@@ -262,8 +288,28 @@ function collectHtmlQualitySnapshot(
   );
   const htmlTag = html.match(/<html\b[^>]*>/i)?.[0] ?? "";
   const imageTags = html.match(/<img\b[^>]*>/gi) ?? [];
-  const formControls =
-    html.match(/<(?:input|select|textarea|button)\b[^>]*>/gi) ?? [];
+  const formControls = [
+    ...(html.match(/<input\b[^>]*>/gi) ?? []),
+    ...(html.match(
+      /<(?:select|textarea|button)\b[^>]*>[\s\S]*?<\/(?:select|textarea|button)>/gi,
+    ) ?? []),
+  ];
+  const labelFors = new Set(
+    (html.match(/<label\b[^>]*>/gi) ?? [])
+      .map((tag) => getAttribute(tag, "for"))
+      .filter(Boolean),
+  );
+  const anchors = Array.from(html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi));
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  const canonicalTag = linkTags.find((tag) =>
+    getAttribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"),
+  );
+  const robotsContent = metaTags
+    .filter((tag) =>
+      ["robots", "googlebot"].includes(getAttribute(tag, "name").toLowerCase()),
+    )
+    .map((tag) => getAttribute(tag, "content"))
+    .join(",");
 
   return {
     title,
@@ -277,12 +323,24 @@ function collectHtmlQualitySnapshot(
       (tag) => !/\salt\s*=\s*["'][^"']*["']/i.test(tag),
     ).length,
     formControlCount: formControls.length,
-    unlabeledFormControls: formControls.filter(
-      (tag) =>
-        !getAttribute(tag, "aria-label").trim() &&
-        !getAttribute(tag, "aria-labelledby").trim() &&
-        !getAttribute(tag, "id").trim(),
-    ).length,
+    unlabeledFormControls: formControls.filter((tag) => {
+      const id = getAttribute(tag, "id").trim();
+      const visibleText = tag.replace(/<[^>]+>/g, " ").trim();
+      const type = getAttribute(tag, "type").toLowerCase();
+      const inputButtonName = ["button", "submit", "reset", "image"].includes(
+        type,
+      )
+        ? getAttribute(tag, "value") || getAttribute(tag, "alt")
+        : "";
+      return !(
+        (id && labelFors.has(id)) ||
+        getAttribute(tag, "aria-label").trim() ||
+        getAttribute(tag, "aria-labelledby").trim() ||
+        getAttribute(tag, "title").trim() ||
+        visibleText ||
+        inputButtonName.trim()
+      );
+    }).length,
     hasViewportMeta: metaTags.some(
       (tag) => getAttribute(tag, "name").toLowerCase() === "viewport",
     ),
@@ -290,6 +348,23 @@ function collectHtmlQualitySnapshot(
       new URL(pageUrl).protocol === "https:"
         ? (html.match(/(?:src|href)\s*=\s*["']http:\/\//gi) ?? []).length
         : 0,
+    canonicalUrl: canonicalTag ? getAttribute(canonicalTag, "href") : "",
+    isNoIndex: /(?:^|[\s,])noindex(?:[\s,]|$)/i.test(robotsContent),
+    linkCount: anchors.length,
+    unlabeledLinks: anchors.filter((match) => {
+      const attributes = match[1];
+      const content = match[2];
+      const visibleText = content.replace(/<[^>]+>/g, " ").trim();
+      const imageAlt =
+        content.match(/<img\b[^>]*\balt\s*=\s*["']([^"']+)["']/i)?.[1] ?? "";
+      return !(
+        visibleText ||
+        getAttribute(attributes, "aria-label").trim() ||
+        getAttribute(attributes, "aria-labelledby").trim() ||
+        getAttribute(attributes, "title").trim() ||
+        imageAlt.trim()
+      );
+    }).length,
   };
 }
 

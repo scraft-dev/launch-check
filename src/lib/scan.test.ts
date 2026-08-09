@@ -85,7 +85,7 @@ test("builds a report with score, severity counts, and export JSON", () => {
   assert.equal(report.severitySummary.medium, 2);
   assert.equal(report.severitySummary.low, 1);
   assert.equal(report.performance.loadTimeLabel, "1.3s");
-  assert.equal(report.issues[0].severity, "medium");
+  assert.equal(report.issues[0].severity, "high");
   assert.match(exportScanReport(sampleScan), /"launchScore": 66/);
 });
 
@@ -153,6 +153,6 @@ test("includes findings and broken links from crawled pages without duplicating 
   assert.equal(report.severitySummary.medium, 1);
   assert.equal(report.severitySummary.low, 0);
   assert.equal(report.issues.length, 2);
-  assert.equal(report.issues[0].pageUrl, "https://example.com/about");
-  assert.equal(report.issues[1].pageUrl, "https://example.com/missing");
+  assert.equal(report.issues[0].pageUrl, "https://example.com/missing");
+  assert.equal(report.issues[1].pageUrl, "https://example.com/about");
 });

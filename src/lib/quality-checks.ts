@@ -22,6 +22,10 @@ export type PageQualitySnapshot = {
   unlabeledFormControls: number;
   hasViewportMeta: boolean;
   mixedContentCount: number;
+  canonicalUrl: string;
+  isNoIndex: boolean;
+  linkCount: number;
+  unlabeledLinks: number;
 };
 
 export function buildQualityFindings(
@@ -60,6 +64,43 @@ export function buildQualityFindings(
       detail: "Search results may show an unpredictable page excerpt.",
       recommendation:
         "Add a clear meta description that summarizes the page in about 120–160 characters.",
+    });
+  } else if (
+    snapshot.metaDescription.length < 70 ||
+    snapshot.metaDescription.length > 160
+  ) {
+    findings.push({
+      id: "meta-description-length",
+      category: "seo",
+      severity: "low",
+      title: "Meta description length needs review",
+      detail: `The meta description is ${snapshot.metaDescription.length} characters long.`,
+      recommendation:
+        "Write a useful, page-specific description of approximately 120–160 characters.",
+    });
+  }
+
+  if (!snapshot.canonicalUrl.trim()) {
+    findings.push({
+      id: "missing-canonical",
+      category: "seo",
+      severity: "low",
+      title: "Canonical URL is missing",
+      detail: "Search engines have no explicit preferred URL for this page.",
+      recommendation:
+        'Add a <link rel="canonical"> element containing the preferred absolute URL.',
+    });
+  }
+
+  if (snapshot.isNoIndex) {
+    findings.push({
+      id: "page-noindex",
+      category: "seo",
+      severity: "high",
+      title: "Page is excluded from search results",
+      detail: "A robots directive contains noindex.",
+      recommendation:
+        "Remove the noindex directive before launch if this page should appear in search results.",
     });
   }
 
@@ -119,6 +160,18 @@ export function buildQualityFindings(
       detail: `${snapshot.unlabeledFormControls} of ${snapshot.formControlCount} form controls have no accessible name.`,
       recommendation:
         "Associate each control with a visible <label> or an appropriate aria-label.",
+    });
+  }
+
+  if (snapshot.unlabeledLinks > 0) {
+    findings.push({
+      id: "unlabeled-links",
+      category: "accessibility",
+      severity: "medium",
+      title: "Links do not have accessible names",
+      detail: `${snapshot.unlabeledLinks} of ${snapshot.linkCount} links have no readable label.`,
+      recommendation:
+        "Add descriptive link text or an accessible label so assistive technology can identify each destination.",
     });
   }
 

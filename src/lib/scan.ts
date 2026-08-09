@@ -43,6 +43,13 @@ export type ScanErrorResponse = {
 
 export type IssueSeverity = "critical" | "high" | "medium" | "low";
 
+const severityPriority: Record<IssueSeverity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
 export type ScanReport = {
   launchScore: number;
   severitySummary: Record<IssueSeverity, number>;
@@ -322,7 +329,10 @@ export function buildScanReport(scanResult: ScanResponse): ScanReport {
       pageUrl: scanResult.finalUrl,
     })),
     ...crawledPageIssues,
-  ];
+  ].sort(
+    (left, right) =>
+      severityPriority[left.severity] - severityPriority[right.severity],
+  );
 
   return {
     launchScore,
