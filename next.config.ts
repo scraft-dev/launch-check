@@ -11,9 +11,6 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/scan": [
       "./node_modules/@sparticuz/chromium/**/*",
-      "./node_modules/axe-core/**/*",
-      "./node_modules/js-library-detector/**/*",
-      "./node_modules/lighthouse/**/*",
       "./node_modules/playwright-core/**/*",
     ],
   },

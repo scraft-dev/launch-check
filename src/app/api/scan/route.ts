@@ -14,9 +14,6 @@ import {
   deliverNotification,
   readNotificationConfig,
 } from "@/lib/notifications";
-import lighthouse from "lighthouse";
-import * as chromeLauncher from "chrome-launcher";
-
 export const maxDuration = 60;
 
 async function getChromiumLaunchOptions() {
@@ -105,6 +102,10 @@ function clampScore(value: number): number {
 async function runLighthouseAudit(
   targetUrl: string,
 ): Promise<LighthouseMetrics> {
+  const [{ default: lighthouse }, chromeLauncher] = await Promise.all([
+    import("lighthouse"),
+    import("chrome-launcher"),
+  ]);
   const launchOptions = await getChromiumLaunchOptions();
   const chrome = await chromeLauncher.launch({
     chromePath: launchOptions.executablePath,
@@ -228,7 +229,9 @@ async function collectScanData(targetUrl: string): Promise<ScanResponse> {
     const finalUrl = page.url();
     const pageTitle = await page.title();
     const httpStatus = response?.status() ?? 0;
-    const lighthouseMetrics = await runLighthouseAudit(targetUrl);
+    const lighthouseMetrics = process.env.VERCEL
+      ? undefined
+      : await runLighthouseAudit(targetUrl);
     const screenshots = [
       {
         kind: "desktop" as const,
