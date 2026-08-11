@@ -22,5 +22,112 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.launch-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 10%, rgb(37 99 235 / 18%), transparent 30rem),
+    radial-gradient(
+      circle at 88% 18%,
+      rgb(14 165 233 / 13%),
+      transparent 26rem
+    ),
+    #f8fafc;
+}
+
+.launch-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgb(15 23 42 / 5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(15 23 42 / 5%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 75%);
+}
+
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 32px 90px -55px rgb(15 23 42 / 60%);
+}
+
+.hero-panel::after {
+  position: absolute;
+  top: -7rem;
+  right: -5rem;
+  width: 22rem;
+  height: 22rem;
+  border: 1px solid rgb(147 197 253 / 35%);
+  border-radius: 9999px;
+  content: "";
+  box-shadow:
+    0 0 0 3rem rgb(219 234 254 / 24%),
+    0 0 0 6rem rgb(239 246 255 / 22%);
+  animation: float-orbit 9s ease-in-out infinite;
+}
+
+.scan-button {
+  box-shadow: 0 14px 30px -12px rgb(37 99 235 / 70%);
+}
+
+.scan-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px -12px rgb(37 99 235 / 80%);
+}
+
+.result-shell {
+  background:
+    radial-gradient(circle at 85% 2%, rgb(59 130 246 / 16%), transparent 25rem),
+    #f8fafc;
+}
+
+.score-ring {
+  display: grid;
+  width: 9rem;
+  height: 9rem;
+  place-items: center;
+  border-radius: 9999px;
+  background: conic-gradient(#2563eb var(--score), #dbeafe 0);
+  box-shadow: 0 24px 50px -30px rgb(37 99 235 / 85%);
+}
+
+.score-ring::before {
+  grid-area: 1 / 1;
+  width: 7.25rem;
+  height: 7.25rem;
+  border-radius: inherit;
+  background: #fff;
+  content: "";
+}
+
+.score-ring > * {
+  z-index: 1;
+  grid-area: 1 / 1;
+}
+
+@keyframes float-orbit {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-1rem, 1.25rem, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-panel::after {
+    animation: none;
+  }
+
+  .scan-button {
+    transition: none;
+  }
 }

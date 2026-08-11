@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { buildScanReport, type ScanResponse } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
 import {
@@ -69,7 +69,7 @@ export default function ResultsPage() {
   const priorityIssues = report.issues.slice(0, 5);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-8 text-slate-900 sm:px-8 sm:py-12">
+    <main className="result-shell min-h-screen px-5 py-8 text-slate-900 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <header className="flex items-center justify-between border-b border-slate-200 pb-5">
           <Link className="font-semibold text-blue-700" href="/">
@@ -103,14 +103,18 @@ export default function ResultsPage() {
                 {result.pageTitle || result.finalUrl}
               </h1>
             </div>
-            <div className="shrink-0 border-l-2 border-blue-600 pl-5">
-              <p className="text-sm text-slate-500">
-                {isJapanese ? "総合スコア" : "Launch score"}
-              </p>
-              <p className="text-5xl font-semibold">
-                {report.launchScore}
-                <span className="text-lg text-slate-400"> / 100</span>
-              </p>
+            <div
+              className="score-ring shrink-0"
+              style={{ "--score": `${report.launchScore}%` } as CSSProperties}
+            >
+              <div className="text-center">
+                <p className="text-4xl font-semibold text-slate-950">
+                  {report.launchScore}
+                </p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  {isJapanese ? "総合スコア" : "Score"}
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -123,7 +127,7 @@ export default function ResultsPage() {
           </p>
         ) : null}
 
-        <section className="grid border-y border-slate-200 sm:grid-cols-3">
+        <section className="grid overflow-hidden rounded-2xl border border-white/80 bg-white/75 shadow-[0_24px_70px_-50px_rgba(15,23,42,.65)] backdrop-blur sm:grid-cols-3">
           {[
             [
               isJapanese ? "HTTP状態" : "HTTP status",
@@ -140,7 +144,7 @@ export default function ResultsPage() {
           ].map(([label, value]) => (
             <div
               key={label}
-              className="py-5 sm:border-r sm:px-6 first:pl-0 last:border-r-0"
+              className="border-b border-slate-100 px-6 py-5 last:border-b-0 sm:border-r sm:border-b-0 sm:px-7 sm:py-6 last:border-r-0"
             >
               <p className="text-sm text-slate-500">{label}</p>
               <p className="mt-1 text-2xl font-semibold">{value}</p>

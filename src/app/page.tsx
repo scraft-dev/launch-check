@@ -212,9 +212,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 lg:px-8 lg:py-16">
+    <div className="launch-shell min-h-screen px-4 py-8 text-slate-900 sm:px-6 lg:px-8 lg:py-16">
       <main className="mx-auto flex max-w-6xl flex-col gap-6">
-        <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm sm:p-10 lg:p-14">
+        <section className="hero-panel rounded-[2rem] border border-white/80 bg-white/90 p-8 backdrop-blur-sm sm:p-10 lg:p-14">
           <div className="mb-8 flex justify-end gap-1 text-sm">
             <button
               type="button"
@@ -232,10 +232,18 @@ export default function Home() {
               English
             </button>
           </div>
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
-              Launch Check
-            </p>
+          <div className="relative z-10 max-w-2xl">
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-200">
+                LC
+              </span>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
+                Launch Check
+              </p>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                LIVE
+              </span>
+            </div>
             <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
               {isJapanese
                 ? "公開前に、サイトの問題を見つける。"
@@ -247,7 +255,19 @@ export default function Home() {
                 : "Enter a URL to check availability, speed, SEO, and accessibility."}
             </p>
 
-            <div className="mt-6 border-y border-slate-200 py-4 text-sm leading-7 text-slate-600">
+            <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-3 border-y border-slate-200/80 py-5 text-sm text-slate-600 sm:grid-cols-4">
+              {["SEO", "A11Y", "SPEED", "LINKS"].map((item, index) => (
+                <div key={item} className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-blue-500">
+                    0{index + 1}
+                  </span>
+                  <span className="font-semibold tracking-wide text-slate-700">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 text-sm leading-7 text-slate-600">
               {isJapanese
                 ? "分かること：ページが正常に開くか／表示を遅くしている要因／SEO・アクセシビリティの不足／優先して直す項目"
                 : "Checks: page availability, performance bottlenecks, SEO and accessibility gaps, and what to fix first."}
@@ -255,7 +275,7 @@ export default function Home() {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <input
-                className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-base text-slate-700 outline-none ring-0 placeholder:text-slate-400 sm:max-w-md"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-4 text-base text-slate-700 shadow-[0_12px_35px_-24px_rgba(15,23,42,.6)] outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 placeholder:text-slate-400 sm:max-w-md"
                 type="url"
                 placeholder="https://example.com"
                 value={url}
@@ -268,7 +288,7 @@ export default function Home() {
               />
               <button
                 type="button"
-                className="rounded-full bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                className="scan-button rounded-2xl bg-blue-600 px-7 py-4 text-base font-semibold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                 onClick={handleStartScan}
                 disabled={url.trim() === "" || isScanning}
               >
