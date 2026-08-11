@@ -25,6 +25,8 @@ export type ScanResponse = {
     note: string;
   }>;
   pdfReport?: PdfReportPayload;
+  scanMode?: "browser" | "http";
+  notice?: string;
 };
 
 export type PdfReportPayload = {

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   buildScanReport,
   exportScanReport,
@@ -20,10 +21,14 @@ import {
 } from "@/lib/crawl";
 import { buildLighthouseAudit } from "@/lib/lighthouse";
 import { createScreenshotArtifacts } from "@/lib/screenshots";
+import { getStoredLocale, setStoredLocale, type AppLocale } from "@/lib/locale";
 
 export default function Home() {
+  const router = useRouter();
+  const [locale, setLocale] = useState<AppLocale>("en");
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+  const [scanNotice, setScanNotice] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<
     (ScanResponse & { analysis?: ScanAnalysis }) | null
@@ -38,6 +43,20 @@ export default function Home() {
     ReturnType<typeof createScreenshotArtifacts>
   >([]);
   const [pdfReport, setPdfReport] = useState<PdfReportPayload | null>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setLocale(getStoredLocale());
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const isJapanese = locale === "ja";
+
+  function changeLocale(nextLocale: AppLocale) {
+    setLocale(nextLocale);
+    setStoredLocale(nextLocale);
+  }
 
   const scanReport = useMemo(() => {
     if (!scanResult) {
@@ -59,6 +78,7 @@ export default function Home() {
     }
 
     setError("");
+    setScanNotice("");
     setScanResult(null);
     setCrawlSummary(null);
     setCrawlResult(null);
@@ -113,6 +133,9 @@ export default function Home() {
         setLighthouseAudit(nextLighthouseAudit);
         setScreenshots(nextScreenshots);
         setPdfReport(nextScanResult.pdfReport ?? null);
+        if (nextScanResult.notice) {
+          setScanNotice(nextScanResult.notice);
+        }
         const fallbackCrawlResult = buildCrawlResult(
           [trimmedUrl],
           [
@@ -136,6 +159,17 @@ export default function Home() {
           loadTime: nextScanResult.loadTime,
           summary: buildScanReport(nextScanResult).summary,
         });
+
+        const resultForStorage = {
+          ...nextScanResult,
+          screenshots: undefined,
+          pdfReport: undefined,
+        };
+        window.sessionStorage.setItem(
+          "launch-check-latest-result",
+          JSON.stringify(resultForStorage),
+        );
+        router.push("/results");
       }
     } catch {
       setError("Unable to scan this website right now.");
@@ -148,6 +182,7 @@ export default function Home() {
   function handleReset() {
     setUrl("");
     setError("");
+    setScanNotice("");
     setIsScanning(false);
     setScanResult(null);
     setCrawlSummary(null);
@@ -180,16 +215,43 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6 lg:px-8 lg:py-16">
       <main className="mx-auto flex max-w-6xl flex-col gap-6">
         <section className="rounded-3xl border border-blue-100 bg-white p-8 shadow-sm sm:p-10 lg:p-14">
+          <div className="mb-8 flex justify-end gap-1 text-sm">
+            <button
+              type="button"
+              className={`px-3 py-1.5 ${isJapanese ? "font-semibold text-blue-700" : "text-slate-500"}`}
+              onClick={() => changeLocale("ja")}
+            >
+              日本語
+            </button>
+            <span className="py-1.5 text-slate-300">/</span>
+            <button
+              type="button"
+              className={`px-3 py-1.5 ${!isJapanese ? "font-semibold text-blue-700" : "text-slate-500"}`}
+              onClick={() => changeLocale("en")}
+            >
+              English
+            </button>
+          </div>
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
               Launch Check
             </p>
             <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-950 sm:text-5xl">
-              Launch with confidence.
+              {isJapanese
+                ? "公開前に、サイトの問題を見つける。"
+                : "Find website issues before launch."}
             </h1>
             <p className="mt-4 text-lg leading-8 text-slate-600 sm:text-xl">
-              Catch critical website issues before your users do.
+              {isJapanese
+                ? "URLを入力するだけで、表示・速度・SEO・アクセシビリティを確認できます。"
+                : "Enter a URL to check availability, speed, SEO, and accessibility."}
             </p>
+
+            <div className="mt-6 border-y border-slate-200 py-4 text-sm leading-7 text-slate-600">
+              {isJapanese
+                ? "分かること：ページが正常に開くか／表示を遅くしている要因／SEO・アクセシビリティの不足／優先して直す項目"
+                : "Checks: page availability, performance bottlenecks, SEO and accessibility gaps, and what to fix first."}
+            </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <input
@@ -210,7 +272,13 @@ export default function Home() {
                 onClick={handleStartScan}
                 disabled={url.trim() === "" || isScanning}
               >
-                {isScanning ? "Scanning..." : "Start Scan"}
+                {isScanning
+                  ? isJapanese
+                    ? "確認中..."
+                    : "Scanning..."
+                  : isJapanese
+                    ? "スキャンする"
+                    : "Start Scan"}
               </button>
             </div>
 
@@ -220,11 +288,18 @@ export default function Home() {
                 checked={multiPageEnabled}
                 onChange={() => setMultiPageEnabled((value) => !value)}
               />
-              Run a multi-page crawl (safe internal-link scan)
+              {isJapanese
+                ? "サイト内の複数ページも確認する"
+                : "Scan multiple internal pages"}
             </label>
 
             {error ? (
               <p className="mt-3 text-sm font-medium text-red-600">{error}</p>
+            ) : null}
+            {scanNotice ? (
+              <p className="mt-3 text-sm font-medium text-amber-700">
+                {scanNotice}
+              </p>
             ) : null}
 
             <div className="mt-4 flex flex-wrap gap-4">

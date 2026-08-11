@@ -65,6 +65,8 @@ export type ScanResponse = {
     note: string;
   }>;
   pdfReport?: PdfReportPayload;
+  scanMode?: "browser" | "http";
+  notice?: string;
 };
 
 export type ScanResponseWithAnalysis = ScanResponse & {
@@ -522,9 +524,9 @@ async function collectScanData(
       {
         kind: "desktop" as const,
         dataUrl: await page
-          .screenshot({ fullPage: false, type: "png" })
+          .screenshot({ fullPage: false, type: "jpeg", quality: 65 })
           .then(
-            (buffer) => `data:image/png;base64,${buffer.toString("base64")}`,
+            (buffer) => `data:image/jpeg;base64,${buffer.toString("base64")}`,
           ),
         note: "Desktop screenshot captured with Playwright",
       },
@@ -541,9 +543,10 @@ async function collectScanData(
               .catch(() => undefined);
             const buffer = await page.screenshot({
               fullPage: false,
-              type: "png",
+              type: "jpeg",
+              quality: 65,
             });
-            return `data:image/png;base64,${buffer.toString("base64")}`;
+            return `data:image/jpeg;base64,${buffer.toString("base64")}`;
           }),
         note: "Mobile screenshot captured with Playwright",
       },
@@ -588,6 +591,57 @@ async function collectScanData(
   }
 }
 
+async function collectHttpScanData(
+  targetUrl: string,
+  crawlConfig?: CrawlConfig,
+): Promise<ScanResponse> {
+  const startedAt = Date.now();
+  const response = await fetch(targetUrl, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(15000),
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; LaunchCheckBot/1.0; +https://launch-check-five.vercel.app)",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  const html = contentType.includes("text/html") ? await response.text() : "";
+  const finalUrl = response.url || targetUrl;
+  const qualitySnapshot = collectHtmlQualitySnapshot(html, finalUrl);
+  const qualityFindings = buildQualityFindings(qualitySnapshot);
+  const initialLinks = crawlConfig ? collectHtmlLinks(html, finalUrl) : [];
+  const crawlResult = crawlConfig
+    ? await crawlInternalPages(
+        finalUrl,
+        {
+          url: finalUrl,
+          title: qualitySnapshot.title || `HTTP ${response.status}`,
+          status: response.status,
+          findings: qualityFindings,
+        },
+        initialLinks,
+        crawlConfig,
+      )
+    : undefined;
+
+  return {
+    url: targetUrl,
+    finalUrl,
+    pageTitle: qualitySnapshot.title || `HTTP ${response.status}`,
+    httpStatus: response.status,
+    loadTime: Date.now() - startedAt,
+    consoleErrors: [],
+    pageErrors: [],
+    failedRequests: [],
+    qualityFindings,
+    crawlResult,
+    scanMode: "http",
+    notice:
+      "A lightweight scan was used because the visual browser scan was unavailable. Browser errors and screenshots are not included.",
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -605,7 +659,23 @@ export async function POST(request: Request) {
     const crawlConfig = body.multiPage
       ? getSafeCrawlConfig(Math.min(body.crawlConfig?.maxPages ?? 4, 4))
       : undefined;
-    const scanResult = await collectScanData(targetUrl, crawlConfig);
+    let scanResult: ScanResponse;
+    try {
+      scanResult = {
+        ...(await collectScanData(targetUrl, crawlConfig)),
+        scanMode: "browser",
+      };
+    } catch (browserError) {
+      console.warn("Visual browser scan failed; using HTTP fallback", {
+        name:
+          browserError instanceof Error ? browserError.name : "UnknownError",
+        message:
+          browserError instanceof Error
+            ? browserError.message
+            : "Unknown browser scan error",
+      });
+      scanResult = await collectHttpScanData(targetUrl, crawlConfig);
+    }
     const analysis = buildFallbackAnalysis(scanResult);
     const scanReport = buildScanReport(scanResult);
     const lighthouseAudit = buildLighthouseAudit(scanResult);
@@ -622,7 +692,13 @@ export async function POST(request: Request) {
           `SEO: ${lighthouseAudit.seo}`,
         ],
       },
-    );
+    ).catch((pdfError) => {
+      console.warn("PDF report generation failed", {
+        message:
+          pdfError instanceof Error ? pdfError.message : "Unknown PDF error",
+      });
+      return undefined;
+    });
     const crawlSummary = scanResult.crawlResult
       ? `${scanResult.crawlResult.summary} ${scanResult.crawlResult.brokenPages} broken page${scanResult.crawlResult.brokenPages === 1 ? "" : "s"}; ${scanResult.crawlResult.totalFindings} quality finding${scanResult.crawlResult.totalFindings === 1 ? "" : "s"}.`
       : undefined;
