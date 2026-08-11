@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildScanReport, type ScanResponse } from "@/lib/scan";
 import type { ScanAnalysis } from "@/lib/ai-analysis";
-import { getStoredLocale, setStoredLocale, type AppLocale } from "@/lib/locale";
+import {
+  getStoredLocale,
+  localizeIssue,
+  setStoredLocale,
+  type AppLocale,
+} from "@/lib/locale";
 
 type StoredResult = ScanResponse & { analysis?: ScanAnalysis };
 
@@ -154,27 +159,39 @@ export default function ResultsPage() {
           </p>
           <div className="mt-7 divide-y divide-slate-200 border-t border-slate-200">
             {priorityIssues.length ? (
-              priorityIssues.map((issue, index) => (
-                <article
-                  key={`${issue.title}-${index}`}
-                  className="grid gap-3 py-6 sm:grid-cols-[3rem_1fr]"
-                >
-                  <span className="text-sm text-slate-400">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="font-semibold">{issue.title}</h3>
-                      <span className="text-xs uppercase tracking-wide text-blue-700">
-                        {issue.severity}
-                      </span>
+              priorityIssues.map((rawIssue, index) => {
+                const issue = localizeIssue(locale, rawIssue);
+                const severity = isJapanese
+                  ? {
+                      critical: "緊急",
+                      high: "重要",
+                      medium: "注意",
+                      low: "軽微",
+                    }[rawIssue.severity]
+                  : rawIssue.severity;
+
+                return (
+                  <article
+                    key={`${issue.title}-${index}`}
+                    className="grid gap-3 py-6 sm:grid-cols-[3rem_1fr]"
+                  >
+                    <span className="text-sm text-slate-400">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="font-semibold">{issue.title}</h3>
+                        <span className="text-xs uppercase tracking-wide text-blue-700">
+                          {severity}
+                        </span>
+                      </div>
+                      <p className="mt-2 leading-7 text-slate-600">
+                        {issue.recommendation ?? issue.detail}
+                      </p>
                     </div>
-                    <p className="mt-2 leading-7 text-slate-600">
-                      {issue.recommendation ?? issue.detail}
-                    </p>
-                  </div>
-                </article>
-              ))
+                  </article>
+                );
+              })
             ) : (
               <p className="py-7 text-slate-600">
                 {isJapanese
