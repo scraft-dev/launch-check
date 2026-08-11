@@ -196,7 +196,7 @@ export default function Home() {
                   WEBSITE QUALITY SCAN
                 </span>
               </div>
-              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+              <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:whitespace-nowrap lg:text-[clamp(2.25rem,4vw,3.5rem)]">
                 {isJapanese
                   ? "Webサイト公開前チェック"
                   : "Pre-launch website check"}
@@ -242,7 +242,7 @@ export default function Home() {
                       type="submit"
                       className="scan-button rounded-2xl bg-blue-600 px-8 py-4 font-semibold text-white transition-all hover:bg-blue-700"
                     >
-                      {isJapanese ? "無料で確認" : "Scan free"}
+                      {isJapanese ? "診断を開始" : "Start scan"}
                     </button>
                   )}
                 </div>
