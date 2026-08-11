@@ -10,7 +10,6 @@ import {
   type CrawlResult,
 } from "@/lib/crawl";
 import { buildLighthouseAudit, type LighthouseMetrics } from "@/lib/lighthouse";
-import { buildPdfReport } from "@/lib/pdf";
 import {
   buildQualityFindings,
   type PageQualitySnapshot,
@@ -520,37 +519,6 @@ async function collectScanData(
     const lighthouseMetrics = process.env.VERCEL
       ? undefined
       : await runLighthouseAudit(targetUrl);
-    const screenshots = [
-      {
-        kind: "desktop" as const,
-        dataUrl: await page
-          .screenshot({ fullPage: false, type: "jpeg", quality: 65 })
-          .then(
-            (buffer) => `data:image/jpeg;base64,${buffer.toString("base64")}`,
-          ),
-        note: "Desktop screenshot captured with Playwright",
-      },
-      {
-        kind: "mobile" as const,
-        dataUrl: await page
-          .setViewportSize({ width: 390, height: 844 })
-          .then(async () => {
-            await page
-              .goto(targetUrl, {
-                waitUntil: "domcontentloaded",
-                timeout: 5000,
-              })
-              .catch(() => undefined);
-            const buffer = await page.screenshot({
-              fullPage: false,
-              type: "jpeg",
-              quality: 65,
-            });
-            return `data:image/jpeg;base64,${buffer.toString("base64")}`;
-          }),
-        note: "Mobile screenshot captured with Playwright",
-      },
-    ];
     const crawlResult = crawlConfig
       ? await crawlInternalPages(
           finalUrl,
@@ -584,7 +552,6 @@ async function collectScanData(
       lighthouseMetrics,
       qualityFindings,
       crawlResult,
-      screenshots,
     };
   } finally {
     await browser.close();
@@ -647,6 +614,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       url?: string;
       multiPage?: boolean;
+      detailed?: boolean;
       crawlConfig?: { maxPages?: number; maxDepth?: number };
     };
     const targetUrl = normalizeUrl(body.url ?? "");
@@ -661,10 +629,12 @@ export async function POST(request: Request) {
       : undefined;
     let scanResult: ScanResponse;
     try {
-      scanResult = {
-        ...(await collectScanData(targetUrl, crawlConfig)),
-        scanMode: "browser",
-      };
+      scanResult = body.detailed
+        ? {
+            ...(await collectScanData(targetUrl, crawlConfig)),
+            scanMode: "browser",
+          }
+        : await collectHttpScanData(targetUrl, crawlConfig);
     } catch (browserError) {
       console.warn("Visual browser scan failed; using HTTP fallback", {
         name:
@@ -679,26 +649,6 @@ export async function POST(request: Request) {
     const analysis = buildFallbackAnalysis(scanResult);
     const scanReport = buildScanReport(scanResult);
     const lighthouseAudit = buildLighthouseAudit(scanResult);
-    const pdfReport = await buildPdfReport(
-      "Launch Check Report",
-      scanReport.summary,
-      lighthouseAudit.opportunities.map((opportunity) => opportunity.title),
-      (scanResult.screenshots ?? []).map((screenshot) => screenshot.dataUrl),
-      {
-        score: lighthouseAudit.performance,
-        details: [
-          `Accessibility: ${lighthouseAudit.accessibility}`,
-          `Best Practices: ${lighthouseAudit.bestPractices}`,
-          `SEO: ${lighthouseAudit.seo}`,
-        ],
-      },
-    ).catch((pdfError) => {
-      console.warn("PDF report generation failed", {
-        message:
-          pdfError instanceof Error ? pdfError.message : "Unknown PDF error",
-      });
-      return undefined;
-    });
     const crawlSummary = scanResult.crawlResult
       ? `${scanResult.crawlResult.summary} ${scanResult.crawlResult.brokenPages} broken page${scanResult.crawlResult.brokenPages === 1 ? "" : "s"}; ${scanResult.crawlResult.totalFindings} quality finding${scanResult.crawlResult.totalFindings === 1 ? "" : "s"}.`
       : undefined;
@@ -743,7 +693,6 @@ export async function POST(request: Request) {
       ...scanResult,
       analysis,
       crawlSummary,
-      pdfReport,
     } satisfies ScanResponseWithAnalysis & { crawlSummary?: string });
   } catch (error) {
     console.error("Website scan failed", {

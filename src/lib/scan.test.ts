@@ -5,8 +5,17 @@ import {
   exportScanReport,
   getUrlValidationError,
   getUserFriendlyScanError,
+  normalizeWebsiteUrl,
   type ScanResponse,
 } from "./scan";
+
+test("adds https to website addresses without a protocol", () => {
+  assert.equal(normalizeWebsiteUrl("example.com"), "https://example.com");
+  assert.equal(
+    normalizeWebsiteUrl(" https://example.com/path "),
+    "https://example.com/path",
+  );
+});
 
 test("accepts valid public http URLs", () => {
   assert.equal(getUrlValidationError("https://example.com"), null);

@@ -13,6 +13,7 @@ export function getStoredLocale(): AppLocale {
 export function setStoredLocale(locale: AppLocale): void {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    window.document.documentElement.lang = locale;
   }
 }
 

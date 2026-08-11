@@ -1,21 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Launch Check",
+  title: "Launch Check | Website Quality Scan",
   description:
-    "Launch Check helps teams validate website readiness before launch.",
+    "Check website availability, speed, SEO, accessibility, and broken links before launch.",
+  metadataBase: new URL("https://launch-check-five.vercel.app"),
+  openGraph: {
+    title: "Launch Check",
+    description:
+      "Find website issues and prioritize what to fix before launch.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -24,10 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

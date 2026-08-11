@@ -81,6 +81,15 @@ function normalizePageUrl(value: string): string {
   }
 }
 
+export function normalizeWebsiteUrl(value: string): string {
+  const trimmedValue = value.trim();
+  if (!trimmedValue || /^[a-z][a-z\d+.-]*:\/\//i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue}`;
+}
+
 export function getUrlValidationError(value: string): string | null {
   const trimmedValue = value.trim();
 
