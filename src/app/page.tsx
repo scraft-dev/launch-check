@@ -198,13 +198,13 @@ export default function Home() {
               </div>
               <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.1] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
                 {isJapanese
-                  ? "公開前に、直すべき場所が分かる。"
-                  : "Know what to fix before launch."}
+                  ? "Webサイト公開前チェック"
+                  : "Pre-launch website check"}
               </h1>
               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
                 {isJapanese
-                  ? "URLを入れるだけ。表示状態、速度、SEO、アクセシビリティを確認し、優先順位を付けて返します。"
-                  : "Enter a URL to check availability, speed, SEO, and accessibility—ordered by priority."}
+                  ? "URLを入力すると、表示状態、速度、SEO、アクセシビリティを確認できます。"
+                  : "Enter a URL to check availability, speed, SEO, and accessibility."}
               </p>
 
               <form className="mt-8" onSubmit={handleSubmit}>
