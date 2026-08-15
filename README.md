@@ -46,7 +46,7 @@ A production Dockerfile and GitHub Actions quality workflow are included. Before
 4. Run E2E and load tests against the production URL.
 5. Configure uptime monitoring for `/api/health`.
 
-See [Production Runbook](docs/production-runbook.md) and [Security Review](docs/security-review.md).
+See [Production Runbook](docs/production-runbook.md), [Security Review](docs/security-review.md), [Product Definition](docs/product-definition.md), and [Post-MVP Roadmap](docs/post-mvp-roadmap.md).
 
 ## Project structure
 
