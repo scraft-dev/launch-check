@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildReportComparison,
   createReportSnapshot,
   LEGACY_LAUNCH_SCORE_POLICY_VERSION,
   REPORT_SCHEMA_VERSION,
@@ -46,14 +47,38 @@ test("creates a deterministic versioned Report from an existing scan result", ()
   assert.equal(firstReport.launchScore, 82);
   assert.equal(firstReport.findings.length, 2);
   assert.equal(firstReport.findings[0].technicalSeverity, "high");
-  assert.equal(firstReport.findings[0].launchPriority, null);
-  assert.equal(firstReport.findings[0].issueStatus, null);
+  assert.equal(firstReport.findings[0].launchPriority, "high");
+  assert.equal(firstReport.findings[0].issueStatus, "open");
   assert.equal(firstReport.findings[0].location.category, "seo");
   assert.equal(
     firstReport.policyVersions.launchScore,
     LEGACY_LAUNCH_SCORE_POLICY_VERSION,
   );
-  assert.equal(firstReport.policyVersions.launchPriority, null);
+  assert.equal(firstReport.policyVersions.launchPriority, "launch-priority-v1");
+  assert.equal(firstReport.launchDecision, "ready");
+});
+
+test("compares rescans using stable finding fingerprints and priority deltas", () => {
+  const previous = createReportSnapshot({
+    reportId: "report_previous",
+    scannedAt: "2026-08-15T00:00:00.000Z",
+    scanResult: scanFixture,
+  });
+  const current = createReportSnapshot({
+    reportId: "report_current",
+    scannedAt: "2026-08-15T01:00:00.000Z",
+    scanResult: { ...scanFixture, consoleErrors: [], qualityFindings: [] },
+  });
+
+  const comparison = buildReportComparison(previous, current);
+  assert.equal(comparison.fixed, 2);
+  assert.equal(comparison.new, 0);
+  assert.equal(comparison.remaining, 0);
+  assert.deepEqual(comparison.priorityDelta.high, {
+    previous: 1,
+    current: 0,
+    change: -1,
+  });
 });
 
 test("does not mutate the existing scan response while adapting it", () => {

@@ -1,6 +1,6 @@
 # Post-MVP Roadmap
 
-Status: Issue drafts only until the current MVP is complete
+Status: Core workflow implemented locally; production persistence and authenticated access remain deployment work
 
 LC numbering continues after the existing LC-124 item.
 
@@ -174,11 +174,28 @@ Goal: Add collaboration and assistance after the core QA workflow is stable.
 - Review stored data, retention, access, and AI data boundaries.
 - Verify the complete workflow without AI enabled.
 
-## Issue creation rule
+## Implementation and Issue record
 
-These entries are drafts, not active implementation authorization.
+## Implementation record
 
-After MVP completion:
+The post-MVP workflow is implemented as additive functionality without changing
+the Playwright single-URL scanner contract:
+
+- Phase 2: versioned Reports, actionable findings, Launch Priority, filtering,
+  and sorting.
+- Phase 3: opaque share IDs, direct Report URLs, and persisted Open, Fixed, and
+  Ignored status updates with audit timestamps.
+- Phase 4: Report lineage, versioned fingerprints, Fixed/New/Remaining
+  comparison, priority deltas, and a versioned Launch Decision.
+- Phase 5 foundation: workspace selection, local Report history, access-policy
+  helpers, and optional advisory AI remediation copied from the scan result.
+
+Production deployment still requires a durable private `REPORT_STORE_PATH` (or
+a managed repository implementation) and authenticated actor enforcement before
+private team data is stored. The initial share URL remains intentionally public
+to anyone who possesses its opaque URL.
+
+The implementation followed this sequence:
 
 1. Confirm the MVP acceptance evidence.
 2. Create only the Phase 2 parent Sprint Issue and LC-125 through LC-130 tasks.

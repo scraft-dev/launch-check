@@ -8,6 +8,7 @@ export default function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
 
   async function loadWorkspaces() {
     const response = await fetch("/api/workspaces");
@@ -17,6 +18,11 @@ export default function WorkspacesPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      setActiveWorkspaceId(
+        window.localStorage.getItem("launch-check-current-workspace-id") ?? "",
+      );
+    });
 
     void fetch("/api/workspaces")
       .then((response) => response.json() as Promise<Workspace[]>)
@@ -28,8 +34,15 @@ export default function WorkspacesPage() {
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(frame);
     };
   }, []);
+
+  function selectWorkspace(id: string) {
+    window.localStorage.setItem("launch-check-current-workspace-id", id);
+    setActiveWorkspaceId(id);
+    setMessage("Workspace selected for new Reports");
+  }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,12 +155,24 @@ export default function WorkspacesPage() {
                         {workspace.shareScanHistory ? "on" : "off"}
                       </p>
                     </div>
-                    <button
-                      className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-700"
-                      onClick={() => void handleDelete(workspace.id)}
-                    >
-                      Delete
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="rounded-full border border-blue-200 px-3 py-1 text-sm text-blue-700"
+                        onClick={() => selectWorkspace(workspace.id)}
+                        type="button"
+                      >
+                        {activeWorkspaceId === workspace.id
+                          ? "Selected"
+                          : "Use for Reports"}
+                      </button>
+                      <button
+                        className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-700"
+                        onClick={() => void handleDelete(workspace.id)}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}

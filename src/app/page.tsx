@@ -19,6 +19,7 @@ import {
   type StoredScan,
 } from "@/lib/user-history";
 import { getStoredLocale, setStoredLocale, type AppLocale } from "@/lib/locale";
+import type { ReportSnapshot } from "@/lib/report";
 
 type ScanResult = ScanResponse & {
   analysis?: ScanAnalysis;
@@ -41,6 +42,17 @@ export default function Home() {
     const frame = window.requestAnimationFrame(() => {
       setLocale(getStoredLocale());
       setRecentScans(getScanHistory().slice(0, 3));
+      const pendingRescan = window.localStorage.getItem(
+        "launch-check-pending-rescan",
+      );
+      if (pendingRescan) {
+        try {
+          const parsed = JSON.parse(pendingRescan) as { url?: string };
+          if (parsed.url) setUrl(parsed.url);
+        } catch {
+          window.localStorage.removeItem("launch-check-pending-rescan");
+        }
+      }
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -117,7 +129,54 @@ export default function Home() {
         "launch-check-latest-result",
         JSON.stringify(data),
       );
-      router.push("/results");
+      let previousReportId: string | null = null;
+      const pendingRescan = window.localStorage.getItem(
+        "launch-check-pending-rescan",
+      );
+      if (pendingRescan) {
+        try {
+          previousReportId =
+            (JSON.parse(pendingRescan) as { reportId?: string }).reportId ??
+            null;
+        } catch {
+          previousReportId = null;
+        }
+      }
+      const reportResponse = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scanResult: data,
+          previousReportId,
+          workspaceId: window.localStorage.getItem(
+            "launch-check-current-workspace-id",
+          ),
+        }),
+      });
+      if (reportResponse.ok) {
+        const savedReport = (await reportResponse.json()) as ReportSnapshot;
+        const storedIds = window.localStorage.getItem(
+          "launch-check-report-history",
+        );
+        let reportIds: string[] = [];
+        try {
+          reportIds = storedIds ? (JSON.parse(storedIds) as string[]) : [];
+        } catch {
+          reportIds = [];
+        }
+        window.localStorage.setItem(
+          "launch-check-report-history",
+          JSON.stringify(
+            [savedReport.reportId, ...reportIds].filter(
+              (id, index, values) => values.indexOf(id) === index,
+            ),
+          ),
+        );
+        window.localStorage.removeItem("launch-check-pending-rescan");
+        router.push(`/reports/${savedReport.reportId}`);
+      } else {
+        router.push("/results");
+      }
     } catch (scanError) {
       if (
         scanError instanceof DOMException &&

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   deleteScanFromHistory,
+  getCurrentUser,
   getScanHistory,
   loginUser,
   logoutUser,
@@ -11,6 +12,7 @@ import {
   type StoredScan,
   type StoredUser,
 } from "@/lib/user-history";
+import type { ReportSnapshot } from "@/lib/report";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<StoredUser | null>(null);
@@ -18,6 +20,33 @@ export default function DashboardPage() {
   const [email, setEmail] = useState("");
   const [query, setQuery] = useState("");
   const [history, setHistory] = useState<StoredScan[]>(() => getScanHistory());
+  const [reports, setReports] = useState<ReportSnapshot[]>([]);
+
+  async function loadReports() {
+    let ids: string[] = [];
+    try {
+      ids = JSON.parse(
+        window.localStorage.getItem("launch-check-report-history") ?? "[]",
+      ) as string[];
+    } catch {
+      ids = [];
+    }
+    const loaded = await Promise.all(
+      ids.map(async (id) => {
+        const response = await fetch(`/api/reports/${encodeURIComponent(id)}`);
+        return response.ok ? ((await response.json()) as ReportSnapshot) : null;
+      }),
+    );
+    setReports(loaded.filter((item): item is ReportSnapshot => Boolean(item)));
+  }
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setUser(getCurrentUser());
+      void loadReports();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const filteredHistory = useMemo(() => {
     if (query.trim()) {
@@ -26,6 +55,19 @@ export default function DashboardPage() {
 
     return history;
   }, [history, query]);
+
+  const filteredReports = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return reports;
+    return reports.filter((report) =>
+      [
+        report.targetUrl,
+        report.finalUrl,
+        report.pageTitle,
+        report.summary,
+      ].some((value) => value.toLowerCase().includes(normalized)),
+    );
+  }, [query, reports]);
 
   function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,6 +81,7 @@ export default function DashboardPage() {
     const nextUser = loginUser(trimmedName, trimmedEmail);
     setUser(nextUser);
     setHistory(getScanHistory());
+    void loadReports();
   }
 
   function handleLogout() {
@@ -180,6 +223,49 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">QA Reports</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Review launch readiness and continue remediation from saved Reports.
+          </p>
+          <div className="mt-6 space-y-3">
+            {filteredReports.length === 0 ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                No Reports saved in this browser yet.
+              </p>
+            ) : (
+              filteredReports.map((report) => (
+                <Link
+                  key={report.reportId}
+                  href={`/reports/${report.reportId}`}
+                  className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      {report.pageTitle || report.targetUrl}
+                    </p>
+                    <p className="text-sm text-slate-600">{report.targetUrl}</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span>Score {report.launchScore}</span>
+                    <span
+                      className={
+                        report.launchDecision === "ready"
+                          ? "font-semibold text-emerald-700"
+                          : "font-semibold text-rose-700"
+                      }
+                    >
+                      {report.launchDecision === "ready"
+                        ? "READY"
+                        : "NOT READY"}
+                    </span>
+                  </div>
+                </Link>
               ))
             )}
           </div>

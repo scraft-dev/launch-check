@@ -28,4 +28,7 @@ Review date: 2026-08-03
 
 - Scanning untrusted websites requires strong container isolation and resource limits.
 - The initial JSON repository is not suitable for concurrent multi-instance writes.
+- Report share identifiers are opaque and non-sequential, but initial shared Reports are accessible to anyone who has the URL. Do not store secrets or private page content in a Report.
+- Report status updates do not yet have authenticated actor verification. Workspace role policy is defined, but it must not be enforced from client-asserted identity data.
+- Vercel temporary storage does not provide durable Report sharing. Configure `REPORT_STORE_PATH` on persistent storage or replace the repository with a managed database before treating shared URLs as production durable.
 - Live provider behavior cannot be certified until production credentials and callbacks are configured.
